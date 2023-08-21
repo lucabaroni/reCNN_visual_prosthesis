@@ -3,6 +3,7 @@ import torch
 from torch.nn import Parameter
 from torch.nn import functional as F
 import warnings
+from experiments.utils import pickle_read
 
 
 class Gaussian3dCyclic(readouts.Readout):
@@ -48,6 +49,7 @@ class Gaussian3dCyclic(readouts.Readout):
         mean_activity=None,
         feature_reg_weight=1.0,
         gamma_readout=None,  # depricated, use feature_reg_weight instead
+        do_not_sample=False,
         **kwargs,
     ):
         """The constructor
@@ -84,6 +86,7 @@ class Gaussian3dCyclic(readouts.Readout):
         )
         self.batch_sample = batch_sample
         self.grid_shape = (1, 1, outdims, 1, 3)
+        self.do_not_sample = do_not_sample
         self.mu = Parameter(
             torch.Tensor(*self.grid_shape)
         )  # mean location of gaussian for each neuron
@@ -126,6 +129,9 @@ class Gaussian3dCyclic(readouts.Readout):
 
         sample = self.training if sample is None else sample
 
+        if self.do_not_sample: # hardcore way to turn off sampling
+            sample = False
+        
         if sample:
             norm = self.mu.new(*grid_shape).normal_()
         else:
@@ -166,7 +172,7 @@ class Gaussian3dCyclic(readouts.Readout):
         if self.fixed_sigma:
             self.sigma.data.uniform_(self.init_sigma_range, self.init_sigma_range)
         else:
-            self.sigma.data.uniform_(0, self.init_sigma_range)
+            self.sigma.data.uniform_(self.init_sigma_range/2, self.init_sigma_range)
             warnings.warn(
                 "sigma is sampled from uniform distribuiton, instead of a fixed value. Consider setting "
                 "fixed_sigma to True"
@@ -282,11 +288,41 @@ class Gaussian3dCyclicNoScale(Gaussian3dCyclic):
     def __init__(
         self,
         *args,
+        ground_truth_positions_file_path="data/antolik/positions_reparametrized.pickle",
+        ground_truth_orientations_file_path="data/antolik/oris_reparametrized.pickle",
+        init_to_ground_truth_positions=False,
+        init_to_ground_truth_orientations=False,
+        freeze_positions=False,
+        freeze_orientations=False,
+        orientation_shift=87.42857142857143, #in degrees
+        factor = 5.5,
+        filtered_neurons=None,
+        # dataloader=None,
+        positions_minus_x=False,
+        positions_minus_y=False,
+        do_not_sample=False,
         **kwargs,
     ):
         """The constructor
         """
-        super().__init__(*args, **kwargs)
+        self.ground_truth_positions_file_path = ground_truth_positions_file_path
+        self.ground_truth_orientations_file_path = ground_truth_orientations_file_path
+        self.init_to_ground_truth_positions = init_to_ground_truth_positions
+        self.init_to_ground_truth_orientations = init_to_ground_truth_orientations
+        self.freeze_positions = freeze_positions
+        self.freeze_orientations = freeze_orientations
+        self.orientation_shift = orientation_shift
+        self.factor = factor
+        self.filtered_neurons = filtered_neurons
+        # self.dataloader = dataloader
+        self.positions_minus_x = positions_minus_x
+        self.positions_minus_y = positions_minus_y
+        self.do_not_sample = do_not_sample
+
+        self.config = kwargs
+
+        super().__init__(*args, do_not_sample=do_not_sample, **kwargs)
+        
 
     def initialize(self, mean_activity=None):
         """Initializes the readout.
@@ -294,19 +330,65 @@ class Gaussian3dCyclicNoScale(Gaussian3dCyclic):
         Args:
             mean_activity (tensor, optional): Tensor of mean activity of the neurons. Defaults to None.
         """
+
         if mean_activity is None:
             mean_activity = self.mean_activity
+
+        # firstly init the data, then can be reinitialized (bellow)
         self.mu.data.uniform_(-self.init_mu_range, self.init_mu_range)
+
         if self.fixed_sigma:
             self.sigma.data.uniform_(self.init_sigma_range, self.init_sigma_range)
         else:
             self.sigma.data.uniform_(0, self.init_sigma_range)
             warnings.warn(
-                "sigma is sampled from uniform distribuiton, instead of a fixed value. Consider setting "
+                "sigma is sampled from uniform distribution, instead of a fixed value. Consider setting "
                 "fixed_sigma to True"
             )
+        
+        # TODO
+        # # if we are supposed to freeze positions from the beginning, we set the
+        # # corresponding part of the sigmas to zero (=> no update)
+        # if self.freeze_positions:
+        #     self.sigma.data[0,0,:,0,:2] = torch.zeros(self.sigma.data[...,:2].shape)
+        
+        # if self.freeze_orientations:
+        #     self.sigma.data[0,0,:,0,2] = torch.zeros(self.sigma.data[...,2].shape)
+
         if self.bias is not None:
             self.initialize_bias(mean_activity=mean_activity)
+
+    def init_neurons(self, dataloader):
+        pos_x = None
+        pos_y = None
+        target_ori = None
+
+        if dataloader and (self.init_to_ground_truth_positions or self.init_to_ground_truth_orientations):
+            pos_x, pos_y, target_ori = dataloader.get_ground_truth(
+                ground_truth_positions_file_path=self.ground_truth_positions_file_path,
+                ground_truth_orientations_file_path=self.ground_truth_orientations_file_path,
+                positions_minus_x=self.positions_minus_x,
+                positions_minus_y=self.positions_minus_y,
+                in_degrees=True,
+            )
+
+        if self.init_to_ground_truth_positions:
+            pos_x = torch.from_numpy(pos_x)
+            pos_y = torch.from_numpy(pos_y)
+
+            # works also when the stimulus is cropped (self.get_stimulus_visual_angle()
+            # returns the visual angle corrected after the stimulus crop)
+            self.mu.data[0,0,:,0,0] = pos_x / (dataloader.get_stimulus_visual_angle() / 2)
+            self.mu.data[0,0,:,0,1] = pos_y / (dataloader.get_stimulus_visual_angle() / 2) # TODO: tady jsem to delil jen self.factor
+
+
+        if self.init_to_ground_truth_orientations:
+            shifted_ori = (target_ori + self.orientation_shift) % 180 # TODO: minus or plus
+            normalized_ori = shifted_ori / 180 # from [0, 180] to [0, 1].. for the network
+            normalized_ori = torch.from_numpy(normalized_ori)
+
+            self.mu.data[0,0,:,0,2] = (normalized_ori) # = normalized_ori
+
 
     def forward(self, x, sample=None, shift=None, out_idx=None, **kwargs): # edited
         """Propagates the input forwards through the readout
@@ -329,7 +411,7 @@ class Gaussian3dCyclicNoScale(Gaussian3dCyclic):
         c_in, w_in, h_in = self.in_shape
         if (c_in, w_in, h_in) != (c, w, h):
             raise ValueError(
-                "the specified feature map dimension is not the readout's expected input dimension"
+                f"the specified feature map dimension is not the readout's expected input dimension. Came in: {x.shape[1:]}, but we want {self.in_shape}"
             )
 
         # we copy the first channel to the end to make it periodic
