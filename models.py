@@ -20,6 +20,9 @@ import logging
 
 from readout import Gaussian3dCyclic, Gaussian3dCyclicNoScale
 from core import RotationEquivariant2dCoreBottleneck
+import matplotlib.pyplot as plt
+from experiments.utils import reconstruct_orientation_maps, get_neuron_estimates
+
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +49,7 @@ class ExtendedEncodingModel(encoding_model):
         self.jackknife_oracle = config["jackknife_oracle"]
         self.generate_oracle_figure = config["generate_oracle_figure"]
         self.loss = PoissonLoss(avg=True)
+        # self.loss = torch.nn.MSELoss()
         self.corr = Corr()
         self.save_hyperparameters()
 
@@ -663,6 +667,7 @@ class reCNN_bottleneck_CyclicGauss3d(ExtendedEncodingModel):
             init_sigma_range=self.config["init_sigma_range"],
             init_mu_range=self.config["init_mu_range"],
             fixed_sigma=self.config["fixed_sigma"],
+            do_not_sample=self.config["do_not_sample"],
         )
 
         self.register_buffer("laplace", torch.from_numpy(laplace()))
@@ -717,6 +722,13 @@ class reCNN_bottleneck_CyclicGauss3d(ExtendedEncodingModel):
         self.log("reg/core reg", core_reg)
         self.log("reg/readout_reg", readout_reg)
         return reg_term
+    
+    def visualize_orientation_map(self, ground_truth_positions_file_path, ground_truth_orientations_file_path, save=False, img_path="img/", suffix="_truth", neuron_dot_size=5):
+        
+        fig, ax = plt.subplots()
+        x, y, o = get_neuron_estimates(self, 5.5)
+        # x, y, o = self.get_ground_truth(ground_truth_positions_file_path, ground_truth_orientations_file_path)
+        reconstruct_orientation_maps(x, y, o, fig, ax, save, 12, 2.4, 2.4, img_path, suffix, neuron_dot_size)
 
 
 class reCNN_bottleneck_CyclicGauss3d_no_scaling(ExtendedEncodingModel):
@@ -733,6 +745,13 @@ class reCNN_bottleneck_CyclicGauss3d_no_scaling(ExtendedEncodingModel):
     """
 
     def __init__(self, **config):
+    # def __init__(self, dataloader=None, **config):
+        """As this network can be initialized to the ground truth positions and orientations,
+        we need a reference to the dataloader from which this ground truth will be provided.
+
+        Args:
+            dataloader (pl.LightningDataModule): Dataset dataloader with method get_ground_truth(pos_path, ori_path, in_degrees)
+        """
         super().__init__(**config)
         self.config = config
         self.nonlinearity = self.config["nonlinearity"]
@@ -772,19 +791,34 @@ class reCNN_bottleneck_CyclicGauss3d_no_scaling(ExtendedEncodingModel):
             init_sigma_range=self.config["init_sigma_range"],
             init_mu_range=self.config["init_mu_range"],
             fixed_sigma=self.config["fixed_sigma"],
+            ground_truth_positions_file_path=config["ground_truth_positions_file_path"],
+            ground_truth_orientations_file_path=config["ground_truth_orientations_file_path"],
+            init_to_ground_truth_positions=config["init_to_ground_truth_positions"],
+            init_to_ground_truth_orientations=config["init_to_ground_truth_orientations"],
+            freeze_positions=config["freeze_positions"],
+            freeze_orientations=config["freeze_orientations"],
+            orientation_shift=config["orientation_shift"], #in degrees
+            factor = config["factor"],
+            filtered_neurons = config["filtered_neurons"],
+            # dataloader = dataloader,
+            positions_minus_x = config["positions_minus_x"],
+            positions_minus_y = config["positions_minus_y"],
+            do_not_sample = config["do_not_sample"],
         )
 
         self.register_buffer("laplace", torch.from_numpy(laplace()))
         self.nonlin = bl.act_func()[config["nonlinearity"]]
+    
+    def init_neurons(self, dataloader=None):
+        self.readout.init_neurons(dataloader)
 
     def forward(self, x):
-        self.log("train/sigma1", self.readout.sigma[0, 0, 0, 0, 1])
-        self.log("train/sigma1b", self.readout.sigma[0, 0, 1, 0, 1])
-        self.log("train/sigma2", self.readout.sigma[0, 0, 0, 0, 1])
-        self.log("train/sigma2b", self.readout.sigma[0, 0, 1, 0, 1])
-        self.log("train/sigma3", self.readout.sigma[0, 0, 0, 0, 1])
-        self.log("train/sigma3b", self.readout.sigma[0, 0, 1, 0, 1])
-        # print(self.readout.sigma.shape)
+        # self.log("train/sigma1", self.readout.sigma[0, 0, 0, 0, 1])
+        # self.log("train/sigma1b", self.readout.sigma[0, 0, 1, 0, 1])
+        # self.log("train/sigma2", self.readout.sigma[0, 0, 0, 0, 1])
+        # self.log("train/sigma2b", self.readout.sigma[0, 0, 1, 0, 1])
+        # self.log("train/sigma3", self.readout.sigma[0, 0, 0, 0, 1])
+        # self.log("train/sigma3b", self.readout.sigma[0, 0, 1, 0, 1])
         x = self.core(x)
         x = self.nonlin(self.readout(x))
         return x
@@ -826,8 +860,34 @@ class reCNN_bottleneck_CyclicGauss3d_no_scaling(ExtendedEncodingModel):
         self.log("reg/core reg", core_reg)
         self.log("reg/readout_reg", readout_reg)
         return reg_term
+    
+    def visualize_orientation_map(self, ground_truth_positions_file_path, ground_truth_orientations_file_path, save=False, img_path="img/", suffix="_truth", neuron_dot_size=5, factor=5.5, shift=0, swap_y_axis=False, neuron_id="all"):
+        """shift is in degrees"""
+
+        shift = (shift * np.pi) / 180 # from degrees to radians
+        
+        fig, ax = plt.subplots()
+        x, y, o = get_neuron_estimates(self, factor)
+        o = [i*np.pi for i in o]
+        o = [(i + shift)%np.pi for i in o]
+        # x, y, o = self.get_ground_truth(ground_truth_positions_file_path, ground_truth_orientations_file_path)
+
+        if neuron_id != "all":
+            x = x[neuron_id]
+            y = y[neuron_id]
+            o = o[neuron_id]
+        
+        print(x)
+        print(y)
+        print(o)
+        
+        if swap_y_axis:
+            reconstruct_orientation_maps(x, -y, o, fig, ax, save, 12, 5.5, 5.5, img_path, suffix, neuron_dot_size)
+        else:
+            reconstruct_orientation_maps(x, y, o, fig, ax, save, 12, 5.5, 5.5, img_path, suffix, neuron_dot_size)
 
 
+# needs_data_loader=True
 class Lurz_Control_Model(ExtendedEncodingModel):
     """Lurz's model used as a control model"""
 
@@ -837,6 +897,7 @@ class Lurz_Control_Model(ExtendedEncodingModel):
         # self.loss = PoissonLoss(avg=True)
         # self.corr = Corr()
         self.nonlinearity = self.config["nonlinearity"]
+        # self.dataloader = dataloader
         
 
         self.core = cores.SE2dCore(
@@ -866,10 +927,35 @@ class Lurz_Control_Model(ExtendedEncodingModel):
             bias=self.config["readout_bias"],
             mean_activity=self.config["mean_activity"],
             feature_reg_weight=self.config["readout_gamma"],
+            init_sigma=self.config["init_sigma_range"],
         )
 
+        # print(self.readout.mu.data.shape) # torch.Size([1, 5000, 1, 2])
+
+        self.init_to_ground_truth_positions = config["init_to_ground_truth_positions"]
+        self.ground_truth_positions_file_path = config["ground_truth_positions_file_path"]
+        self.ground_truth_orientations_file_path = config["ground_truth_orientations_file_path"]
+        self.positions_minus_x = config["positions_minus_x"]
+        self.positions_minus_y = config["positions_minus_y"]
+        self.do_not_sample = config["do_not_sample"]
+        self.positions_swap_axes = config["positions_swap_axes"]
+        
         self.register_buffer("laplace", torch.from_numpy(laplace()))
         self.nonlin = bl.act_func()[config["nonlinearity"]]
+
+
+    # def init_readout_ground_truth(self, ground_truth_positions_file_path, ground_truth_orientations_file_path, dataloader, config):
+    def init_neurons(self, dataloader=None):
+
+        if self.init_to_ground_truth_positions == True:
+            print("initializing to ground truth")
+            pos_x, pos_y, _ = dataloader.get_ground_truth(ground_truth_positions_file_path=self.ground_truth_positions_file_path, ground_truth_orientations_file_path=self.ground_truth_orientations_file_path, in_degrees=True, positions_minus_y=self.positions_minus_y, positions_minus_x=self.positions_minus_x, positions_swap_axes=self.positions_swap_axes)
+            pos_x = torch.from_numpy(pos_x)
+            pos_y = torch.from_numpy(pos_y)
+            # works also when the stimulus is cropped (self.get_stimulus_visual_angle()
+            # returns the visual angle corrected after the stimulus crop)
+            self.readout._mu.data[0,:,0,0] = pos_x / (dataloader.get_stimulus_visual_angle() / 2)        
+            self.readout._mu.data[0,:,0,1] = pos_y / (dataloader.get_stimulus_visual_angle() / 2)
 
     def forward(self, x):
         x = self.core(x)
