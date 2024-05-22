@@ -468,3 +468,6 @@ class Gaussian3dCyclicNoScale(Gaussian3dCyclic):
         if self.bias is not None:
             y = y + bias
         return y
+
+
+

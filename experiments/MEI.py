@@ -28,7 +28,7 @@ class Normalize(nn.Module):
         target_mean = self.mean if self.mean is not None else x_mean
         x_std = x.std(dim=self.dim, keepdims=True)
         target_std = self.std if self.std is not None else x_std
-        return target_std * (x - target_mean) / (x_std + self.eps) #+ target_mean
+        return target_std * (x - target_mean) / (x_std + self.eps) + target_mean
 
 class Clip(nn.Module):
     # module that only clips values of the image
@@ -139,28 +139,33 @@ class GaborFilter(nn.Module):
         img_err = torch.square(x - gabor_filter)
         return out, gabor_filter, img_err
 
-def train_mei(model, device, neuron, std=0.1, steps=500, lr=0.02):
+def train_mei(model, device, neuron, std=0.1, steps=500, lr=0.02, vmin =-1.7919, vmax=2.1919, size=[93,93]):
     
     bar = tqdm(range(steps))
 
-    min_pixel_value = -1.757
-    max_pixel_value = 2.04
-    my_clip = StandardizeClip((max_pixel_value + min_pixel_value) / 2, std, min_pixel_value, max_pixel_value)
+    min_pixel_value = vmin
+    max_pixel_value = vmax
+    my_clip = StandardizeClip((max_pixel_value + min_pixel_value) / 2, std, vmin, vmax)
 
-    im = TrainableImage([55, 55])
+    im = TrainableImage(size)
 
-    optim = torch.optim.Adam(im.parameters(), lr=lr)
+    optim = torch.optim.SGD(im.parameters(), lr=lr)
 
     im.to(device=device)
     model.to(device=device)
     my_clip.to(device=device)
     im.train()
     model.eval()
+    im.img
     
     activation = None
     for step in bar:
         optim.zero_grad()
-        activation = model(my_clip(im()))
+        # print('before:', im().mean(), im().std())
+        im.img.data=my_clip(im())
+        # print('after:', im().mean(), im().std())
+        # print(input_img.mean())
+        activation = model(im())
         loss = -torch.mean(activation[:,neuron])
         loss.backward()
         optim.step()

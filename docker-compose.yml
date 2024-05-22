@@ -1,0 +1,13 @@
+version: '3.4'
+
+services:
+  recnn:
+    image: recnn
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    volumes:
+      - .:/project
+      - /var/sinz-shared:/data
+    env_file: .env
+    runtime: nvidia
