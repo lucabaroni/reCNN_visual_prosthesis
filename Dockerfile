@@ -5,9 +5,12 @@ WORKDIR /src
 
 RUN git config --global credential.helper store && \
     echo https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com >> ~/.git-credentials && \
-    git clone -b model_builder https://github.com/sinzlab/nnvision.git
+    git clone -b model_builder https://github.com/lucabaroni/nnvision.git
+    git clone -b recnn https://github.com/lucabaroni/neuralpredictors.git
 
 RUN python3.9 -m pip install -e /src/nnvision 
+RUN pip uninstall neuralpredictors
+RUN python3.9 -m pip install -e /src/neuralpredictors 
 
 # Upgrade pip and install the required Python packages
 RUN python3.9 -m pip install --upgrade pip && \
@@ -18,7 +21,7 @@ RUN python3.9 -m pip install --upgrade pip && \
         configparser==5.0.2 \
         pillow==9.2.0 \
         markdown==3.3.4 \
-        # neuralpredictors==0.2.0 \ 
+
         numpy==1.21.1 \
         opencv-python==4.5.4.58 \
         pathtools==0.1.2 \
