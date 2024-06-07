@@ -777,7 +777,7 @@ def reCNN_bottleneck_MultiCyclicGauss3d_no_scaling(
         rot_eq_batch_norm=rot_eq_batch_norm,
         input_regularizer=input_regularizer,
         # input_channels=input_channels,
-        hidden_channels=core_hidden_channels,
+        hidden_channels=[core_hidden_channels]*core_layers,
         input_kern=core_input_kern,
         hidden_kern=core_hidden_kern,
         layers=core_layers,
@@ -948,3 +948,83 @@ class EnergyModel(nn.Module):
         return 0
 
 # %%
+
+
+
+
+def BRCNN_with_final_scaling(
+    dataloaders,
+    seed,
+    num_rotations=32, 
+    upsampling=2, 
+    stride=1, 
+    rot_eq_batch_norm=True, 
+    input_regularizer='LaplaceL2norm',
+    hidden_channels = 16, 
+    hidden_kern = 5, 
+    input_kern = 7,
+    layers = 5, 
+    gamma_hidden = 0.01,
+    gamma_input =  0.1,
+    depth_separable = True,
+    use_avg_reg=False, 
+    bottleneck_kernel=5,
+    #readout
+    readout_bias=False, 
+    readout_gamma=0,
+    init_mu_range=0.1, 
+    init_sigma_range=0.1,
+    data_info=None,
+):
+    set_random_seed(seed)
+    if data_info is not None:
+        n_neurons_dict, in_shapes_dict, input_channels = unpack_data_info(data_info)
+    else:
+        if "train" in dataloaders.keys():
+            dataloaders = dataloaders["train"]
+        # Obtain the named tuple fields from the first entry of the first dataloader in the dictionary
+        in_name, out_name = next(iter(list(dataloaders.values())[0]))._fields[:2]
+        session_shape_dict = get_dims_for_loader_dict(dataloaders)
+        n_neurons_dict = {k: v[out_name][1] for k, v in session_shape_dict.items()}
+        in_shapes_dict = {k: v[in_name] for k, v in session_shape_dict.items()}
+        input_channels = [v[in_name][1] for v in session_shape_dict.values()]
+    core_input_channels = (
+        list(input_channels.values())[0]
+        if isinstance(input_channels, dict)
+        else input_channels[0]
+    )
+    readout_in_shape_dict = { k: [num_rotations, *v[-2:]] for k,v in in_shapes_dict.items()}
+    stack = -1
+
+    core = RotationEquivariant2dCore(
+        input_channels=core_input_channels, 
+        num_rotations=num_rotations,
+        stride=stride, 
+        upsampling=upsampling,
+        rot_eq_batch_norm=rot_eq_batch_norm,
+        input_regularizer=input_regularizer, 
+        input_kern=input_kern,
+        hidden_kern = hidden_kern,
+        hidden_channels=[hidden_channels]*(layers-1) + [1],
+        layers = layers,
+        gamma_input=gamma_input,
+        gamma_hidden=gamma_hidden,
+        stack = stack, 
+        depth_separable=depth_separable,
+        use_avg_reg=use_avg_reg)
+
+    readout = MultiReadoutBase(
+        loaders = dataloaders,
+        in_shape_dict = readout_in_shape_dict,
+        n_neurons_dict = n_neurons_dict, 
+        base_readout=Gaussian3dCyclicNoScale, 
+        mean_activity_dict=None, 
+        bias=readout_bias, 
+        init_mu_range=init_mu_range,
+        init_sigma_range=init_sigma_range,
+        gamma_readout=readout_gamma,
+        core = core,
+        )
+    
+    model = Encoder_2(core, readout)
+    return model
