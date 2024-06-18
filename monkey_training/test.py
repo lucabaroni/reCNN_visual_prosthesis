@@ -1,5 +1,5 @@
 #%%
-from nnfabrik.builder import get_model, get_trainer #get_data
+from nnfabrik.builder import get_model, get_trainer, get_data
 import torch
 import matplotlib.pyplot as plt
 import numpy as np 
@@ -11,8 +11,9 @@ from models import EnergyModel
 from pickle_utils import pickleread
 from utils import get_config
 from nnvision.datasets.monkey_loaders import monkey_static_loader_combined_modified
-
 from nnfabrik.utility.nn_helpers import set_random_seed, get_dims_for_loader_dict
+
+import wandb
 
 dj.config["enable_python_native_blobs"] = True
 dj.config["database.host"] = os.environ["DJ_HOST"]
@@ -27,20 +28,19 @@ np.random.seed(seed)
 random.seed(seed)
 
 trainer_fn, trainer_config = ('nnvision.training.trainers.nnvision_trainer',
-{
-'stop_function': 'get_MSE',
-'loss_function': 'MSE',
-'maximize': False,
-'avg_loss': False,
-'device': 'cuda',
-'max_iter': 200,
-'lr_init': 0.005,
-# lr_init': 0.00005,
-'lr_decay_steps': 4,
-'patience': 5,
-'track_training':True,
-'verbose': True,
-'adamw': True})
+    {'stop_function': 'get_MSE',
+    'loss_function': 'MSE',
+    'maximize': False,
+    'avg_loss': False,
+    'device': 'cuda',
+    'max_iter': 200,
+    'lr_init': 0.5,
+    # lr_init': 0.00005,
+    'lr_decay_steps': 4,
+    'patience': 5,
+    'track_training':True,
+    'verbose': True,
+    'adamw': True})
 
 trainer = get_trainer(trainer_fn, trainer_config)
 
@@ -86,10 +86,9 @@ dataset_fn, dataset_config = ('nnvision.datasets.monkey_loaders.monkey_static_lo
     'scale': 0.5,
     'time_bins_sum': 12,
     'batch_size': 128, 
-    'normalize_resps': False})
+    'normalize_resps':True})
 
-dataloaders = monkey_static_loader_combined_modified(pickleread('/project/monkey_training/data_scale0.5.pkl'), **dataset_config)
-
+dataloaders = get_data(dataset_fn, dataset_config)
 data = pickleread('/project/data_all_mei_and_ori.pickle')
 pos1 = []
 pos2 = []
@@ -103,7 +102,6 @@ pos2 = torch.Tensor(pos2)
 ori = torch.Tensor(ori)
 
 config={}
-model_fn, model_config = ('models.reCNN_bottleneck_MultiCyclicGauss3d_with_final_scaling',config)
 
 model_config = dict(
     num_rotations=32, 
@@ -111,7 +109,7 @@ model_config = dict(
     stride=1, 
     rot_eq_batch_norm=True, 
     input_regularizer='LaplaceL2norm',
-    hidden_channels = 16, #(16, 16, 16, 16),
+    hidden_channels = 16, 
     hidden_kern = 5, 
     input_kern = 7,
     # layers = 3, 
@@ -127,25 +125,31 @@ model_config = dict(
     init_sigma_range=0.1,
     data_info=None,
 )
-from models import BRCNN_with_final_scaling
+from models import BRCNN_with_common_scaling
 
-model = BRCNN_with_final_scaling(dataloaders, seed=0, **model_config)
+model = BRCNN_with_common_scaling(dataloaders, seed=0, **model_config)
 
 model.cuda().train()
-model.readout['all_sessions'].mu[0,0,:,0,0] = pos1
-model.readout['all_sessions'].mu[0,0,:,0,1]  = pos2
-model.readout['all_sessions'].mu[0,0,:,0,2]  = ori
+model.readout['all_sessions'].mu.data[0,0,:,0,0] = pos1
+model.readout['all_sessions'].mu.data[0,0,:,0,1]  = pos2
+model.readout['all_sessions'].mu.data[0,0,:,0,2]  = ori
 
+# todo add initialization at right spot
 
 #%%
-# Custom function to enforce sign constraints
-def enforce_sign_constraint(param):
-    with torch.no_grad():
-        param[param < 0.02] = 0.02
+# # Custom function to enforce sign constraints
+# def enforce_sign_constraint(param):
+#     with torch.no_grad():
+#         param[param < 0.02] = 0.02
 
-# Register the hook directly to the final_scale parameter
-if hasattr(model, 'final_scale'):
-    model.final_scale.register_hook(lambda grad: enforce_sign_constraint(model.final_scale))
+# # Register the hook directly to the final_scale parameter
+# if hasattr(model, 'final_scale'):
+#     model.final_scale.register_hook(lambda grad: enforce_sign_constraint(model.final_scale))
 
 trainer(model, dataloaders, seed=seed)
 # %%
+
+x = torch.randn(1,1,46,46).cuda()
+# %%
+
+

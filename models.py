@@ -10,9 +10,6 @@ import torch.nn.functional as F
 import torch
 from collections import OrderedDict
 
-from neuralpredictors.layers.hermite import (
-    HermiteConv2D,
-)
 from neuralpredictors.measures.np_functions import corr as corr_from_neuralpredictors
 from neuralpredictors.measures.np_functions import (
     oracle_corr_jackknife,
@@ -626,6 +623,34 @@ class Encoder_2(nn.Module):
     def regularizer(self, data_key):
         return self.core.regularizer() + self.readout.regularizer(data_key=data_key)
 
+class Encoder_common_scaling(nn.Module):
+    def __init__(self, core, readout):
+        super().__init__()
+        self.core = core
+        self.readout = readout
+        n_neurons = self.readout['all_sessions'].mu.shape[2]
+        self.final_scale = nn.Parameter(torch.ones([1, 1]))
+        self.final_bias = nn.Parameter(torch.zeros([1, 1]))
+
+    def forward(self, x, data_key=None, repeat_channel_dim=None, **kwargs):
+        if repeat_channel_dim is not None:
+            x = x.repeat(1, repeat_channel_dim, 1, 1)
+            x[:, 1:, ...] = 0
+        x = self.core(x)
+        x = self.readout(x, data_key=data_key, **kwargs)
+
+        output_attn_weights = kwargs.get("output_attn_weights", False)
+        if output_attn_weights:
+            if len(x) == 2:
+                x, attention_weights = x
+            else:
+                x, weights_1, weights_2 = x
+                attention_weights = (weights_1, weights_2)
+            return F.softplus(x) + 1, attention_weights
+        return self.final_scale * F.softplus(x) + self.final_bias
+
+    def regularizer(self, data_key):
+        return self.core.regularizer() + self.readout.regularizer(data_key=data_key)
 
 def unpack_data_info(data_info):
     in_shapes_dict = {k: v["input_dimensions"] for k, v in data_info.items()}
@@ -1027,4 +1052,82 @@ def BRCNN_with_final_scaling(
         )
     
     model = Encoder_2(core, readout)
+    return model
+
+
+def BRCNN_with_common_scaling(
+    dataloaders,
+    seed,
+    num_rotations=32, 
+    upsampling=2, 
+    stride=1, 
+    rot_eq_batch_norm=True, 
+    input_regularizer='LaplaceL2norm',
+    hidden_channels = 16, 
+    hidden_kern = 5, 
+    input_kern = 7,
+    layers = 5, 
+    gamma_hidden = 0.01,
+    gamma_input =  0.1,
+    depth_separable = True,
+    use_avg_reg=False, 
+    bottleneck_kernel=5,
+    #readout
+    readout_bias=False, 
+    readout_gamma=0,
+    init_mu_range=0.1, 
+    init_sigma_range=0.1,
+    data_info=None,
+):
+    set_random_seed(seed)
+    if data_info is not None:
+        n_neurons_dict, in_shapes_dict, input_channels = unpack_data_info(data_info)
+    else:
+        if "train" in dataloaders.keys():
+            dataloaders = dataloaders["train"]
+        # Obtain the named tuple fields from the first entry of the first dataloader in the dictionary
+        in_name, out_name = next(iter(list(dataloaders.values())[0]))._fields[:2]
+        session_shape_dict = get_dims_for_loader_dict(dataloaders)
+        n_neurons_dict = {k: v[out_name][1] for k, v in session_shape_dict.items()}
+        in_shapes_dict = {k: v[in_name] for k, v in session_shape_dict.items()}
+        input_channels = [v[in_name][1] for v in session_shape_dict.values()]
+    core_input_channels = (
+        list(input_channels.values())[0]
+        if isinstance(input_channels, dict)
+        else input_channels[0]
+    )
+    readout_in_shape_dict = { k: [num_rotations, *v[-2:]] for k,v in in_shapes_dict.items()}
+    stack = -1
+
+    core = RotationEquivariant2dCore(
+        input_channels=core_input_channels, 
+        num_rotations=num_rotations,
+        stride=stride, 
+        upsampling=upsampling,
+        rot_eq_batch_norm=rot_eq_batch_norm,
+        input_regularizer=input_regularizer, 
+        input_kern=input_kern,
+        hidden_kern = hidden_kern,
+        hidden_channels=[hidden_channels]*(layers-1) + [1],
+        layers = layers,
+        gamma_input=gamma_input,
+        gamma_hidden=gamma_hidden,
+        stack = stack, 
+        depth_separable=depth_separable,
+        use_avg_reg=use_avg_reg)
+
+    readout = MultiReadoutBase(
+        loaders = dataloaders,
+        in_shape_dict = readout_in_shape_dict,
+        n_neurons_dict = n_neurons_dict, 
+        base_readout=Gaussian3dCyclicNoScale, 
+        mean_activity_dict=None, 
+        bias=readout_bias, 
+        init_mu_range=init_mu_range,
+        init_sigma_range=init_sigma_range,
+        gamma_readout=readout_gamma,
+        core = core,
+        )
+    
+    model = Encoder_common_scaling(core, readout)
     return model

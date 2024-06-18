@@ -1,4 +1,4 @@
-from predict_neural_responses.models import *
+# from predict_neural_responses.models import *
 from collections import OrderedDict, Iterable
 from functools import partial
 from torch import nn
