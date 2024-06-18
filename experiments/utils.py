@@ -3,7 +3,7 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve())) #.. this has to be the folder reCNN_visual_prosthesis
 import wandb
 import glob
-import pytorch_lightning as pl
+# import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle

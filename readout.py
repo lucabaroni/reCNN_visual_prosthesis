@@ -1,10 +1,10 @@
-from predict_neural_responses.models import *
+# from predict_neural_responses.models import *
 import torch
 from torch.nn import Parameter
 from torch.nn import functional as F
 import warnings
 from experiments.utils import pickle_read
-
+import neuralpredictors.layers.readouts as readouts
 
 class Gaussian3dCyclic(readouts.Readout):
     """
@@ -88,7 +88,7 @@ class Gaussian3dCyclic(readouts.Readout):
         self.grid_shape = (1, 1, outdims, 1, 3)
         self.do_not_sample = do_not_sample
         self.mu = Parameter(
-            torch.Tensor(*self.grid_shape), requires_grad=False
+            torch.Tensor(*self.grid_shape)
         )  # mean location of gaussian for each neuron
         self.sigma = Parameter(
             torch.Tensor(*self.grid_shape)
