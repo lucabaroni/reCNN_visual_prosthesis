@@ -5,6 +5,8 @@ from torch.nn import functional as F
 import warnings
 from experiments.utils import pickle_read
 import neuralpredictors.layers.readouts as readouts
+import numpy as np 
+
 
 class Gaussian3dCyclic(readouts.Readout):
     """
@@ -288,12 +290,145 @@ class Gaussian3dCyclicNoScale(Gaussian3dCyclic):
     def __init__(
         self,
         *args,
+        freeze_positions_and_orientations=True,
+        do_not_sample=False,
+        **kwargs,
+    ):
+        """The constructor
+        """
+        self.freeze_positions_and_orientations = freeze_positions_and_orientations
+        self.do_not_sample = do_not_sample
+        self.config = kwargs
+        super().__init__(*args, do_not_sample=do_not_sample, **kwargs)
+        if self.freeze_positions_and_orientations == True:
+            self.mu.requires_grad = False
+
+    def initialize(self, mean_activity=None):
+        """Initializes the readout.
+
+        Args:
+            mean_activity (tensor, optional): Tensor of mean activity of the neurons. Defaults to None.
+        """
+
+        if mean_activity is None:
+            mean_activity = self.mean_activity
+
+        # firstly init the data, then can be reinitialized (bellow)
+        self.mu.data.uniform_(-self.init_mu_range, self.init_mu_range)
+
+        if self.fixed_sigma:
+            self.sigma.data.uniform_(self.init_sigma_range, self.init_sigma_range)
+        else:
+            self.sigma.data.uniform_(0, self.init_sigma_range)
+            warnings.warn(
+                "sigma is sampled from uniform distribution, instead of a fixed value. Consider setting "
+                "fixed_sigma to True"
+            )
+
+
+    def forward(self, x, sample=None, shift=None, out_idx=None, **kwargs): # edited
+        """Propagates the input forwards through the readout
+        
+        Args:
+            x: input data
+            sample (bool/None): sample determines whether we draw a sample from Gaussian distribution, N(mu,sigma), defined per neuron
+                            or use the mean, mu, of the Gaussian distribution without sampling.
+                           if sample is None (default), samples from the N(mu,sigma) during training phase and
+                             fixes to the mean, mu, during evaluation phase.
+                           if sample is True/False, overrides the model_state (i.e training or eval) and does as instructed
+            shift (bool): shifts the location of the grid (from eye-tracking data)
+            out_idx (bool): index of neurons to be predicted
+
+        Returns:
+            y (tensor): neuronal activity
+        """
+
+        N, c, w, h = x.size()
+        c_in, w_in, h_in = self.in_shape
+        if (c_in, w_in, h_in) != (c, w, h):
+            raise ValueError(
+                f"the specified feature map dimension is not the readout's expected input dimension. Came in: {x.shape[1:]}, but we want {self.in_shape}"
+            )
+
+        # we copy the first channel to the end to make it periodic
+        with_copied_first_orientation = torch.cat(
+            [x, x[:, 0, :, :].view(N, 1, w, h)], dim=1
+        )
+
+        with_copied_first_orientation = with_copied_first_orientation.view(
+            N, 1, c + 1, w, h
+        )
+
+        bias = self.bias
+        outdims = self.outdims
+
+        if self.batch_sample:
+            # sample the grid_locations separately per image per batch
+            grid = self.sample_grid(
+                batch_size=N, sample=sample
+            )  # sample determines sampling from Gaussian
+        else:
+            # use one sampled grid_locations for all images in the batch
+            grid = self.sample_grid(batch_size=1, sample=sample).expand(
+                N, outdims, 1, 3
+            )
+
+        if out_idx is not None:
+            # out_idx specifies the indices to subset of neurons for training/testing
+            if isinstance(out_idx, np.ndarray):
+                if out_idx.dtype == bool:
+                    out_idx = np.where(out_idx)[0]
+            grid = grid[:, :, out_idx]
+            if bias is not None:
+                bias = bias[out_idx]
+            outdims = len(out_idx)
+
+        if shift is not None:
+            grid = grid + shift[:, None, None, :]
+
+        y = F.grid_sample(
+            with_copied_first_orientation,
+            grid,
+            align_corners=True,
+            padding_mode="border",
+            mode="bilinear",
+        )
+        # reshapes to a better shape
+        y = y.squeeze(-1).sum(1).view(N, outdims)
+
+        if self.bias is not None:
+            y = y + bias
+        return y
+
+
+class FixedPosOri3DCyclicNoScale(Gaussian3dCyclic):
+    """
+    This is just Gaussian3dCyclic but without parameters for scaling of the neural response for each individual neuron.
+
+    Args:
+        in_shape (list): shape of the input feature map [channels, width, height]
+        outdims (int): number of output units
+        bias (bool): adds a bias term
+        init_mu_range (float): initialises the the mean with Uniform([-init_range, init_range])
+                            [expected: positive value <=1]
+        init_sigma_range (float): initialises sigma with Uniform([0.0, init_sigma_range]).
+                It is recommended however to use a fixed initialization, for faster convergence.
+                For this, set fixed_sigma to True.
+        batch_sample (bool): if True, samples a position for each image in the batch separately
+                            [default: True as it decreases convergence time and performs just as well]
+        fixed_sigma (bool). Recommended behavior: True. But set to false for backwards compatibility.
+                If true, initialized the sigma not in a range, but with the exact value given for all neurons.
+    """
+
+    def __init__(
+        self,
+        *args,
         ground_truth_positions_file_path="data/antolik/positions_reparametrized.pickle",
         ground_truth_orientations_file_path="data/antolik/oris_reparametrized.pickle",
         init_to_ground_truth_positions=False,
         init_to_ground_truth_orientations=False,
-        freeze_positions=False,
-        freeze_orientations=False,
+        freeze_positions=True,
+        freeze_orientations=True,
         orientation_shift=87.42857142857143, #in degrees
         factor = 5.5,
         filtered_neurons=None,
@@ -355,8 +490,8 @@ class Gaussian3dCyclicNoScale(Gaussian3dCyclic):
         # if self.freeze_orientations:
         #     self.sigma.data[0,0,:,0,2] = torch.zeros(self.sigma.data[...,2].shape)
 
-        if self.bias is not None:
-            self.initialize_bias(mean_activity=mean_activity)
+        # if self.bias is not None:
+        #     self.initialize_bias(mean_activity=mean_activity)
 
     def init_neurons(self, dataloader):
         pos_x = None
@@ -470,4 +605,140 @@ class Gaussian3dCyclicNoScale(Gaussian3dCyclic):
         return y
 
 
+class FixedPosOri3dCyclicNoScale(Gaussian3dCyclic):
+    """
+    This is just Gaussian3dCyclic but without parameters for scaling of the neural response for each individual neuron.
 
+    Args:
+        in_shape (list): shape of the input feature map [channels, width, height]
+        outdims (int): number of output units
+        bias (bool): adds a bias term
+        init_mu_range (float): initialises the the mean with Uniform([-init_range, init_range])
+                            [expected: positive value <=1]
+        init_sigma_range (float): initialises sigma with Uniform([0.0, init_sigma_range]).
+                It is recommended however to use a fixed initialization, for faster convergence.
+                For this, set fixed_sigma to True.
+        batch_sample (bool): if True, samples a position for each image in the batch separately
+                            [default: True as it decreases convergence time and performs just as well]
+        fixed_sigma (bool). Recommended behavior: True. But set to false for backwards compatibility.
+                If true, initialized the sigma not in a range, but with the exact value given for all neurons.
+    """
+
+    def __init__(
+        self,
+        *args,
+        do_not_sample=False,
+        **kwargs,
+    ):
+        """The constructor
+        """
+        self.do_not_sample = do_not_sample
+
+        self.config = kwargs
+
+        super().__init__(*args, do_not_sample=do_not_sample, **kwargs)
+        self.register_buffer('mu', torch.Tensor(*self.grid_shape)
+        )  # mean location of gaussian for each neuron
+        self.do_not_sample = True
+        
+
+    def initialize(self, mean_activity=None):
+        """Initializes the readout.
+
+        Args:
+            mean_activity (tensor, optional): Tensor of mean activity of the neurons. Defaults to None.
+        """
+
+        if mean_activity is None:
+            mean_activity = self.mean_activity
+
+        # firstly init the data, then can be reinitialized (bellow)
+        self.mu.data.uniform_(-self.init_mu_range, self.init_mu_range)
+
+        if self.fixed_sigma:
+            self.sigma.data.uniform_(self.init_sigma_range, self.init_sigma_range)
+        else:
+            self.sigma.data.uniform_(0, self.init_sigma_range)
+            warnings.warn(
+                "sigma is sampled from uniform distribution, instead of a fixed value. Consider setting "
+                "fixed_sigma to True"
+            )
+
+    def forward(self, x, sample=None, shift=None, out_idx=None, **kwargs): # edited
+        """Propagates the input forwards through the readout
+        
+        Args:
+            x: input data
+            sample (bool/None): sample determines whether we draw a sample from Gaussian distribution, N(mu,sigma), defined per neuron
+                            or use the mean, mu, of the Gaussian distribution without sampling.
+                           if sample is None (default), samples from the N(mu,sigma) during training phase and
+                             fixes to the mean, mu, during evaluation phase.
+                           if sample is True/False, overrides the model_state (i.e training or eval) and does as instructed
+            shift (bool): shifts the location of the grid (from eye-tracking data)
+            out_idx (bool): index of neurons to be predicted
+
+        Returns:
+            y (tensor): neuronal activity
+        """
+
+        N, c, w, h = x.size()
+        c_in, w_in, h_in = self.in_shape
+        if (c_in, w_in, h_in) != (c, w, h):
+            raise ValueError(
+                f"the specified feature map dimension is not the readout's expected input dimension. Came in: {x.shape[1:]}, but we want {self.in_shape}"
+            )
+
+        # we copy the first channel to the end to make it periodic
+        with_copied_first_orientation = torch.cat(
+            [x, x[:, 0, :, :].view(N, 1, w, h)], dim=1
+        )
+
+        with_copied_first_orientation = with_copied_first_orientation.view(
+            N, 1, c + 1, w, h
+        )
+
+        bias = self.bias
+        outdims = self.outdims
+
+        if self.batch_sample:
+            # sample the grid_locations separately per image per batch
+            grid = self.sample_grid(
+                batch_size=N, sample=sample
+            )  # sample determines sampling from Gaussian
+        else:
+            # use one sampled grid_locations for all images in the batch
+            grid = self.sample_grid(batch_size=1, sample=sample).expand(
+                N, outdims, 1, 3
+            )
+
+        if out_idx is not None:
+            # out_idx specifies the indices to subset of neurons for training/testing
+            if isinstance(out_idx, np.ndarray):
+                if out_idx.dtype == bool:
+                    out_idx = np.where(out_idx)[0]
+            grid = grid[:, :, out_idx]
+            if bias is not None:
+                bias = bias[out_idx]
+            outdims = len(out_idx)
+
+        if shift is not None:
+            grid = grid + shift[:, None, None, :]
+
+        #  - Gets values from a grid
+        #  - align_corners=True, because we need to have -1 as the center of the
+        #    orientation 0 and value 1 mapped to the center of (again) orientation
+        #    0, but it is copied at the end
+        y = F.grid_sample(
+            with_copied_first_orientation,
+            grid,
+            align_corners=True,
+            padding_mode="border",
+            mode="bilinear",
+        )
+
+        # reshapes to a better shape
+        y = y.squeeze(-1).sum(1).view(N, outdims)
+
+        if self.bias is not None:
+            y = y + bias
+        return y

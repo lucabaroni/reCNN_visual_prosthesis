@@ -18,32 +18,28 @@ dj.config["database.host"] = os.environ["DJ_HOST"]
 dj.config["database.user"] = os.environ["DJ_USER"]
 dj.config["database.password"] = os.environ["DJ_PASSWORD"]
 
-# Set up your default hyperparameters
-with open("/project/monkey_training/sweep_config_test.yaml") as file:
-    config = yaml.load(file, Loader=yaml.FullLoader)
-
-run = wandb.init(config=config)
-
-lr_init = wandb.config.lr_init
-batch_size = wandb.config.batch_size
-upsampling= wandb.config.upsampling
-rot_eq_batch_norm = wandb.config.rot_eq_batch_norm 
-hidden_channels = wandb.config.hidden_channels
-hidden_kern = wandb.config.hidden_kern 
-input_kern = wandb.config.input_kern
-layers = wandb.config.layers 
-gamma_hidden = float(wandb.config.gamma_hidden)
-gamma_input = float(wandb.config.gamma_input)
-depth_separable = wandb.config.depth_separable
-init_sigma_range = 0.1
-fine_tune = 'core'
-
 seed = 1
 torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
+lr_init = 0.001
+batch_size = 20
+upsampling= 1
+rot_eq_batch_norm = True
+hidden_channels = 8
+hidden_kern = 9
+input_kern = 5
+layers = 7
+gamma_hidden = 0.0195
+gamma_input = 0 
+depth_separable = False
+init_sigma_range = 0.1
+fine_tune='core'
+
 h5 = '/project/results_convnext_model.h5'
+
+
 data1 = {i: {} for i in range(458)}
 with h5py.File(h5, 'r') as f:
     for i in range(458):
@@ -53,6 +49,7 @@ with h5py.File(h5, 'r') as f:
         dataset_name = f'preferred_pos/neuron_{i}'
         if dataset_name in f:
             data1[i]['preferred_pos'] = f[dataset_name][:]
+
 
 # Set up your default hyperparameters
 with open("/project/monkey_training/sweep_config_test.yaml") as file:
@@ -65,12 +62,11 @@ trainer_fn, trainer_config = ('nnvision.training.trainers.nnvision_trainer',
     {'stop_function': 'get_correlations',
     'loss_function': 'MSE',
     'maximize': True,
-    'avg_loss': False,
     'device': 'cuda',
-    'max_iter': 200,
+    'max_iter': 1,
     'lr_init':  lr_init,
     'lr_decay_steps': 3, 
-    'patience': 4,
+    'patience': 5,
     'track_training':False,
     'verbose': True,
     'adamw': True,
@@ -141,6 +137,41 @@ dataset_fn, dataset_config = ('nnvision.datasets.monkey_loaders.monkey_static_lo
     'normalize_resps':True})
 dataloaders = get_data(dataset_fn, dataset_config)
 
+
+# neuron_datasets = {}
+# def stack_neuron_datasets(file_name):
+#     with h5py.File(file_name, 'r') as f:
+#         neuron_datasets = []
+    
+#         def collect_neuron_datasets(name, obj):
+#             if isinstance(obj, h5py.Dataset) and name.startswith('full_field_params/neuron_'):
+#                 neuron_datasets[](f[name][:])
+    
+#         f.visititems(collect_neuron_datasets)
+    
+#         # Stack all collected datasets
+#         if neuron_datasets:
+#             stacked_data = np.vstack(neuron_datasets)
+#             return stacked_data
+#         else:
+#             return None
+
+# data = pickleread('/project/data_all_mei_and_ori.pickle')
+# #%%
+# data = pickleread('/project/data_all_mei_and_ori.pickle')
+# id0_pos1 = []
+# id0_pos2 = []
+# id0_ori = []
+# for i in range(458):
+#     id0_pos1.append((data[i]['center_mask_mei'][0]-(93/2))/(93/2))
+#     id0_pos2.append((data[i]['center_mask_mei'][1]-(93/2))/(93/2))
+#     id0_ori.append(data[i]['preferred_ori']/180)
+# id0_pos1 = torch.Tensor(id0_pos1)[ids0]
+# id0_pos2 = torch.Tensor(id0_pos2)[ids0]
+# id0_ori = torch.Tensor(id0_ori)[ids0]
+
+
+# new 
 id0_pos1 = []
 id0_pos2 = []
 id0_ori = []
@@ -179,23 +210,21 @@ model.readout['all_sessions'].mu.data[0,0,:,0,0] = id0_pos1
 model.readout['all_sessions'].mu.data[0,0,:,0,1]  = id0_pos2
 model.readout['all_sessions'].mu.data[0,0,:,0,2]  = id0_ori
 
-pos_init = model.readout['all_sessions'].mu.data[0,0,:,0,0]
+print(model.readout['all_sessions'].mu.data[0,0,:,0,0])
 
 # train model 
 val_correlation, output, model_state_dict = trainer(model, dataloaders, seed=seed)
 #%%
 results = {
-    'val/corr' : output['validation_corr'], 
-    'val/MSE' : get_MSE(model, dataloaders['validation'], as_dict=False, per_neuron=False), 
-    'test/MSE': get_MSE(model, dataloaders['test'], as_dict=False, per_neuron=False),
+    # 'val/corr' : output['validation_corr'], 
+    # 'val/MSE' : get_MSE(model, dataloaders['validation'], as_dict=False, per_neuron=False), 
+    # 'test/MSE': get_MSE(model, dataloaders['test'], as_dict=False, per_neuron=False),
     'test/corr': get_correlations(model, dataloaders['test'], as_dict=False, per_neuron=False),
     'test/avg_corr': get_avg_correlations(model, dataloaders['test'], as_dict=False, per_neuron=False),
 }
 results
 #%%
-pos_after = model.readout['all_sessions'].mu.data[0,0,:,0,0]
-
-assert (pos_init == pos_after).all()
+print(model.readout['all_sessions'].mu.data[0,0,:,0,0])
 
 #%%
 results = {
@@ -244,6 +273,7 @@ left_out_dataset_fn, left_out_dataset_config = ('nnvision.datasets.monkey_loader
 
 left_out_dataloaders = get_data(left_out_dataset_fn, left_out_dataset_config)
 
+
 id1_pos1 = []
 id1_pos2 = []
 id1_ori = []
@@ -268,5 +298,119 @@ results.update({
     'test/corr__second_subject' : get_correlations(model2, left_out_dataloaders['test'], as_dict=False, per_neuron=False), 
 })
 
+
+#%%
+import featurevis
+import featurevis.ops as ops
+from featurevis.utils import Compose
+import torch.nn as nn
+
+
+class SingleCellModel(nn.Module):
+    def __init__(self, model, idx):
+        super().__init__()
+        self.model = model
+        self.idx = idx
+    
+    def forward(self, x):
+        return self.model(x)[:, self.idx].squeeze()
+
+
+def create_mei(model, std=0.05, seed=42, img_res = [93,93], pixel_min = -1.7876, pixel_max = 2.1919, gaussianblur=1., device=None, step_size=10, num_steps=1000):
+    if device==None:
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    random_seed = seed
+    np.random.seed(random_seed)
+    torch.manual_seed(random_seed)
+    initial_image = torch.randn(1, 1, *img_res, dtype=torch.float32).to(device)*std
+    model.eval()
+    model.to(device)
+    initial_image = initial_image.to(device)
+    mean = (pixel_min + pixel_max)/2
+    
+    # TODO decide if we need to add it 
+    post_update =Compose([ops.ChangeStats(std=std, mean=mean), ops.ClipRange(pixel_min, pixel_max)])
+    opt_x, fevals, reg_values = featurevis.gradient_ascent(
+        model,
+        initial_image, 
+        step_size=step_size,
+        num_iterations=num_steps, 
+        post_update=post_update,
+        gradient_f = ops.GaussianBlur(gaussianblur),
+        print_iters=1001,
+    )
+    mei = opt_x.detach().cpu().numpy().squeeze()
+    mei_act = fevals[-1]
+    return mei,  mei_act
+
+#%%
+for i in range():
+    model0 = SingleCellModel(model2, i)
+    mei, act = create_mei(model0, std=0.15, img_res=[46,46], num_steps=100)
+    import matplotlib.pyplot as plt 
+    plt.imshow(mei)
+    plt.title(i)
+    plt.show()
+#%%
+wandb.log(results)
+wandb.run.summary.update(results)
+
+
 # Finish the wandb run
 run.finish()
+
+# # %%
+
+# import featurevis
+# import featurevis.ops as ops
+# from featurevis.utils import Compose
+# import torch.nn as nn
+
+
+# class SingleCellModel(nn.Module):
+#     def __init__(self, model, idx):
+#         super().__init__()
+#         self.model = model
+#         self.idx = idx
+    
+#     def forward(self, x):
+#         return self.model(x)[:, self.idx].squeeze()
+
+
+# def create_mei(model, std=0.05, seed=42, img_res = [93,93], pixel_min = -1.7876, pixel_max = 2.1919, gaussianblur=1., device=None, step_size=10, num_steps=1000):
+#     if device==None:
+#         device = 'cuda' if torch.cuda.is_available() else 'cpu'
+#     random_seed = seed
+#     np.random.seed(random_seed)
+#     torch.manual_seed(random_seed)
+#     initial_image = torch.randn(1, 1, *img_res, dtype=torch.float32).to(device)*std
+#     model.eval()
+#     model.to(device)
+#     initial_image = initial_image.to(device)
+#     mean = (pixel_min + pixel_max)/2
+    
+#     # TODO decide if we need to add it 
+#     post_update =Compose([ops.ChangeStats(std=std, mean=mean), ops.ClipRange(pixel_min, pixel_max)])
+#     opt_x, fevals, reg_values = featurevis.gradient_ascent(
+#         model,
+#         initial_image, 
+#         step_size=step_size,
+#         num_iterations=num_steps, 
+#         post_update=post_update,
+#         gradient_f = ops.GaussianBlur(gaussianblur),
+#         print_iters=1001,
+#     )
+#     mei = opt_x.detach().cpu().numpy().squeeze()
+#     mei_act = fevals[-1]
+#     return mei,  mei_act
+
+# #%%
+# model.eval()
+# for i in [57]:
+#     model0 = SingleCellModel(model, i)
+#     mei, act = create_mei(model0, std=0.15, img_res=[46,46], num_steps=100)
+#     import matplotlib.pyplot as plt 
+#     plt.imshow(mei)
+#     plt.title(i)
+#     plt.show()
+# # %%
