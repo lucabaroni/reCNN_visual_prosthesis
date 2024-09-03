@@ -1,19 +1,23 @@
 # Use the base image with specified version details
 FROM sinzlab/pytorch:v3.9-torch1.9.0-cuda11.1-dj0.12.7
 
-ARG GITHUB_USER
-ARG GITHUB_TOKEN
 
 # Set the working directory
 WORKDIR /src
 
 # Clone nnvision repository
-RUN git config --global credential.helper store && \
-    echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" >> ~/.git-credentials && \
-    git clone -b model_builder https://github.com/lucabaroni/nnvision.git
+
+RUN git clone -b package-conversion https://github.com/lucabaroni/classical_exps.git
+RUN python3.9 -m pip install -e /src/classical_exps
 
 # Install nnvision
+RUN git clone -b model_builder https://github.com/lucabaroni/nnvision.git 
 RUN python3.9 -m pip install -e /src/nnvision
+
+
+RUN (cd /src/nnvision && git pull)
+RUN (cd /src/classical_exps && git pull)
+
 
 # Uninstall neuralpredictors if already installed
 RUN pip uninstall -y neuralpredictors
