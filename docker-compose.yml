@@ -1,5 +1,3 @@
-version: '3.4'
-
 services:
   recnn:
     image: recnn
@@ -9,5 +7,13 @@ services:
     volumes:
       - .:/project
       - /var/sinz-shared:/data
+      - /CSNG:/CSNG
     env_file: .env
     runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['0']
+            capabilities: [gpu]
