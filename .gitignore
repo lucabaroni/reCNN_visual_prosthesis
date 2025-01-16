@@ -148,3 +148,7 @@ metacentrum/qsub_jupyterlab3.sh
 metacentrum/qsub_smaller.sh
 
 settings.json
+LSV1M_training/saved_models/
+*.pth
+*.pkl
+LSV1M_training/to_delete/core
