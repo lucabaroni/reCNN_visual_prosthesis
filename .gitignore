@@ -152,3 +152,6 @@ LSV1M_training/saved_models/
 *.pth
 *.pkl
 LSV1M_training/to_delete/core
+**/__pycache__
+**/artifacts/
+**/wandb/
