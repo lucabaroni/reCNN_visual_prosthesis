@@ -54,12 +54,6 @@ with h5py.File(h5, 'r') as f:
         if dataset_name in f:
             data1[i]['preferred_pos'] = f[dataset_name][:]
 
-# Set up your default hyperparameters
-with open("/project/monkey_training/sweep_config_test.yaml") as file:
-    config = yaml.load(file, Loader=yaml.FullLoader)
-
-run = wandb.init(project='recnn_train', config=config)
-
 
 trainer_fn, trainer_config = ('nnvision.training.trainers.nnvision_trainer',
     {'stop_function': 'get_correlations',
@@ -267,6 +261,19 @@ results.update({
     'test/avg_corr_second_subject' : get_avg_correlations(model2, left_out_dataloaders['test'], as_dict=False, per_neuron=False), 
     'test/corr__second_subject' : get_correlations(model2, left_out_dataloaders['test'], as_dict=False, per_neuron=False), 
 })
+
+# Log the final results to wandb
+wandb.log(results)
+
+# Log results as a summary
+run.summary['val/corr'] = results['val/corr']
+run.summary['val/MSE'] = results['val/MSE']
+run.summary['test/MSE'] = results['test/MSE']
+run.summary['test/corr'] = results['test/corr']
+run.summary['test/avg_corr'] = results['test/avg_corr']
+run.summary['test/avg_corr_second_subject'] = results['test/avg_corr_second_subject']
+run.summary['test/corr__second_subject'] = results['test/corr__second_subject']
+
 
 # Finish the wandb run
 run.finish()
