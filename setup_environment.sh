@@ -16,7 +16,6 @@ echo "Installing PyTorch and dependencies..."
 conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.7 -c pytorch -c nvidia
 pip install wandb
 
-
 echo "Installing classical_exps from GitHub..."
 pip install -e git+https://github.com/lucabaroni/classical_exps.git@package-conversion#egg=classical_exps
 
@@ -28,7 +27,7 @@ echo "Installing neuralpredictors from GitHub..."
 pip uninstall -y neuralpredictors || true
 pip install -e git+https://github.com/lucabaroni/neuralpredictors.git@recnn#egg=neuralpredictors
 
-echo "Installing protobuf..."
+echo "Installing protobuf..." 
 pip install protobuf
 
 echo "Installing project dependencies..."
