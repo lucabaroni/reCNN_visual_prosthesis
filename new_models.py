@@ -19,13 +19,13 @@ from neuralpredictors.layers.cores.conv2d import RotationEquivariant2dCore
 
 import logging
 
-from readout import Gaussian3dCyclic, Gaussian3dCyclicNoScale
-from core import RotationEquivariant2dCoreBottleneck
+from old_code.readout import Gaussian3dCyclic, Gaussian3dCyclicNoScale
+from old_code.core import RotationEquivariant2dCoreBottleneck
 import matplotlib.pyplot as plt
 from experiments.utils import reconstruct_orientation_maps, get_neuron_estimates
 
 from neuralpredictors.layers.readouts.multi_readout import MultiReadoutBase
-from readout import Gaussian3dCyclicNoScale
+from old_code.readout import Gaussian3dCyclicNoScale
 from nnfabrik.utility.nn_helpers import set_random_seed, get_dims_for_loader_dict
 
 logger = logging.getLogger(__name__)

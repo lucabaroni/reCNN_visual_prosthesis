@@ -1,21 +1,6 @@
-import yaml
-import wandb
 import torch
-import matplotlib.pyplot as plt
 import numpy as np 
-import random 
-import datajoint as dj 
-import os 
-from nnfabrik.builder import get_model, get_trainer, get_data
-import nnvision
-from models import EnergyModel
-from pickle_utils import pickleread
-from utils import get_config
-from nnfabrik.utility.nn_helpers import set_random_seed, get_dims_for_loader_dict
-from nnvision.utility.measures import get_avg_correlations, get_correlations, get_MSE
-from models import BRCNN_with_common_scaling, BRCNN_no_scaling
 from torch.utils.data import Dataset, DataLoader
-import os 
 from collections import namedtuple
 
 class LSV1M_Dataset(Dataset):
@@ -79,14 +64,13 @@ def get_LSV1M_dataloaders(
     ds_validation = LSV1M_Dataset(resps = resps[-n_images_val:, neuron_idxs], stims = stims[-n_images_val:])
 
     dataloaders = {
-        'train': {'all_sessions': DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=0)},
-        'validation': {'all_sessions': DataLoader(ds_validation, batch_size=batch_size, shuffle=False, num_workers=0)}
+        'train': {'all_sessions': DataLoader(ds_train, batch_size=batch_size, shuffle=True)},
+        'validation': {'all_sessions': DataLoader(ds_validation, batch_size=batch_size, shuffle=False)}
     }
 
     print('loading test data')
     resps_multi = np.load('/CSNG/baroni/Dic23data/all_multi_trial_resps.npy')
     stims_multi = np.load('/CSNG/baroni/Dic23data/all_multi_trial_stims55x55.npy')
-    
     
     # preprocess stims
     print('preprocessing test data')
@@ -96,7 +80,6 @@ def get_LSV1M_dataloaders(
         stims_multi = stims_multi - (stims_multi.max() + stims_multi.min())/2
     if normalize_target==True:
         resps_multi = (resps_multi - resps_mean.reshape(1,1,-1))/resps_std.reshape(1,1,-1)
-
     if population =='inh':
         resps_multi = resps_multi[:, :, list(np.array(neuron_idxs) + 37500)]
     else:
@@ -106,7 +89,53 @@ def get_LSV1M_dataloaders(
     dataloaders['test'] =  {'all_sessions': DataLoader(ds_test, batch_size=16, shuffle=True, num_workers=0)}
     return dataloaders
 
+def get_LSV1M_dataloaders_preprocessed(
+    population='both', 
+    n_images_val=5000, 
+    exc_neuron_idxs=np.arange(0,37500),
+    inh_neuron_idxs=np.arange(0,9375), 
+    normalize_input=True, 
+    center_input=True,
+    normalize_target=True,
+    batch_size=16):
+    
+    assert normalize_input==True, 'Normalization of input is required for preprocessed data'
+    assert normalize_target==True, 'Normalization of target is required for preprocessed data'
+    if population == 'both':
+        neuron_idxs = list(exc_neuron_idxs) + list(inh_neuron_idxs + 37500)
+        resps = [
+            '/CSNG/baroni/Dic23data/all_single_trial_V1_Exc_L23_preprocessed.npy',
+            '/CSNG/baroni/Dic23data/all_single_trial_V1_Inh_L23_preprocessed.npy'
+            ]
+    if population == 'exc':
+        neuron_idxs = list(exc_neuron_idxs) 
+        resps = ['/CSNG/baroni/Dic23data/all_single_trial_V1_Exc_L23_preprocessed.npy']
+    if population =='inh':
+        neuron_idxs = list(inh_neuron_idxs)
+        resps = ['/CSNG/baroni/Dic23data/all_single_trial_V1_Inh_L23_preprocessed.npy']
 
+    print('loading data')
+    resps = np.concatenate([np.load(resp) for resp in resps], -1)
+    if center_input:
+        stims = np.load('/CSNG/baroni/Dic23data/all_single_trial_stims55x55_preprocessed_centered.npy')
+    else:
+        stims = np.load('/CSNG/baroni/Dic23data/all_single_trial_stims55x55_preprocessed_non_centered.npy')
+    ds_train =  LSV1M_Dataset(resps = resps[:-n_images_val, neuron_idxs], stims = stims[:-n_images_val])
+    ds_validation = LSV1M_Dataset(resps = resps[-n_images_val:, neuron_idxs], stims = stims[-n_images_val:])
+    dataloaders = {
+        'train': {'all_sessions': DataLoader(ds_train, batch_size=batch_size, shuffle=True)},
+        'validation': {'all_sessions': DataLoader(ds_validation, batch_size=batch_size, shuffle=False)}
+    }
+    print('loading test data')
+    resps_multi = np.load('/CSNG/baroni/Dic23data/all_multi_trial_resps_preprocessed.npy')
+    if center_input:
+        stims_multi = np.load('/CSNG/baroni/Dic23data/all_multi_trial_stims55x55_preprocessed_centered.npy')
+    else:
+        stims_multi = np.load('/CSNG/baroni/Dic23data/all_multi_trial_stims55x55_preprocessed_non_centered.npy')
+        
+    ds_test =  LSV1M_Dataset(resps = resps_multi.mean(axis=1)[:, neuron_idxs], stims = stims_multi)
+    dataloaders['test'] =  {'all_sessions': DataLoader(ds_test, batch_size=16, shuffle=True, num_workers=0)}
+    return dataloaders
 
 def get_LSV1M_empty_dataloaders(
     population='both', 
@@ -131,8 +160,8 @@ def get_LSV1M_empty_dataloaders(
         neuron_idxs = list(inh_neuron_idxs)
         resps = ['/CSNG/baroni/Dic23data/all_single_trial_V1_Inh_L23.npy']
 
-    resps = torch.zeros([10000, 46875])
-    stims = torch.zeros([10000, 55, 55])
+    resps = torch.zeros([100000, 46875])
+    stims = torch.zeros([100000, 55, 55])
 
     if normalize_input==True:
         stims_mean = stims.mean()
@@ -153,4 +182,8 @@ def get_LSV1M_empty_dataloaders(
         'validation': {'all_sessions': DataLoader(ds_validation, batch_size=batch_size, shuffle=False, num_workers=0)}
     }
 
+    resps_multi = torch.zeros([250, 46875])
+    stims_multi = torch.zeros([250, 55, 55])
+    ds_test = LSV1M_Dataset(resps = resps_multi[:, neuron_idxs], stims = stims_multi)
+    dataloaders['test'] = {'all_sessions': DataLoader(ds_test, batch_size=16, shuffle=True, num_workers=0)}
     return dataloaders

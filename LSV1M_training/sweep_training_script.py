@@ -53,7 +53,8 @@ dataloaders = get_LSV1M_dataloaders(
     batch_size=batch_size,
     n_images_val=5000,
     exc_neuron_idxs=exc_neuron_idxs,
-    inh_neuron_idxs=inh_neuron_idxs
+    inh_neuron_idxs=inh_neuron_idxs,
+    # center_input=False # this was not used in the training of the first model.. needs to be uncommented to fix. 
 )
 
 # Trainer configuration
