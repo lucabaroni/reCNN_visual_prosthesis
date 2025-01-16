@@ -106,7 +106,7 @@ def train_model(model, trainer, dataloaders, device, log=True, seed=1):
     model.to(device)
     
     val_correlation, output, model_state_dict = trainer(model, dataloaders, seed=seed)
-    test_corr = get_correlations(model, dataloaders['test'], as_dict=False, per_neuron=True)
+    test_corr = get_correlations(model, dataloaders['test'], as_dict=False, per_neuron=True, device=device)
     
     if log:
         wandb.log({
