@@ -29,7 +29,7 @@ parameters:
     values: [0.001, 0.0001, 0.00001, 0]
   init_sigma_range: 
     values: [0.1, 0.2]
-    fine_tune: 
+  fine_tune: 
     values: [None, 'core']
 
   
