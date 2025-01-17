@@ -38,8 +38,8 @@ def get_base_config():
         'seed': 0,
         'empty': False,
         'wandb_log': True,
-        'adamw': True,
         # add here the parameters to edit
+        'adamw': True,
         }
     return config 
 

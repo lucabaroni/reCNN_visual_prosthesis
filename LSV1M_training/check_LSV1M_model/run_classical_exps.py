@@ -1,6 +1,6 @@
 #%%
 ## Import the config objects
-from LSV1M_training.check_best_model.classical_exps_config import experiments_config, analyses_config, execute_function
+from LSV1M_training.check_LSV1M_model.classical_exps_config import experiments_config, analyses_config, execute_function
 
 ## Perform the experiments
 for exp in experiments_config :

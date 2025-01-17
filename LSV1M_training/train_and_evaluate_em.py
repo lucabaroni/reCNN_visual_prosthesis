@@ -36,11 +36,12 @@ def get_base_config():
         'empty': False,
         'wandb_log': True,
         # add here the parameters to edit
+        'adamw' : True
         }
     return config 
 
 # Setup
-device = setup_cuda() 
+device = setup_cuda(device_id=0) 
 base_config = get_base_config()
 dataset_config = get_dataset_config(**base_config)
 trainer_config = get_trainer_config(**base_config)

@@ -68,7 +68,7 @@ num_samples = 15
 overwrite = False 
 
 ## (optional) Device to perform the experiments on (default will be gpu if available, cpu else)
-device=None
+device='cuda:1'
 
 ## Example Pipeline
 experiments_config = [

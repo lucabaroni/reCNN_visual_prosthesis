@@ -10,26 +10,26 @@ import torch.nn.functional as F
 import torch
 from collections import OrderedDict
 
-from neuralpredictors.measures.np_functions import corr as corr_from_neuralpredictors
-from neuralpredictors.measures.np_functions import (
-    oracle_corr_jackknife,
-    oracle_corr_conservative,
-)
+# from neuralpredictors.measures.np_functions import corr as corr_from_neuralpredictors
+# from neuralpredictors.measures.np_functions import (
+#     oracle_corr_jackknife,
+#     oracle_corr_conservative,
+# )
 from neuralpredictors.layers.cores.conv2d import RotationEquivariant2dCore
-
+from neuralpredictors.layers.readouts.multi_readout import MultiReadoutBase
 import logging
 
 from old_code.readout import Gaussian3dCyclic, Gaussian3dCyclicNoScale
 from old_code.core import RotationEquivariant2dCoreBottleneck
 import matplotlib.pyplot as plt
-from experiments.utils import reconstruct_orientation_maps, get_neuron_estimates
+# from experiments.utils import reconstruct_orientation_maps, get_neuron_estimates
 
-from neuralpredictors.layers.readouts.multi_readout import MultiReadoutBase
+
 
 from old_code.readout import Gaussian3dCyclicNoScale
 from nnfabrik.utility.nn_helpers import set_random_seed, get_dims_for_loader_dict
 import numpy as np
-from neuralpredictors.layers.activations import PiecewiseLinearExpNonlinearity
+# from neuralpredictors.layers.activations import PiecewiseLinearExpNonlinearity
 
 logger = logging.getLogger(__name__)
 

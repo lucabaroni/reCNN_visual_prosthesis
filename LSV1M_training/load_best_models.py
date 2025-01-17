@@ -17,7 +17,7 @@ def load_brcnn_model(population='both', dataloaders_batch_size=300, dataloaders_
     """Load and configure a pretrained BRCNN model."""
     
     set_random_seeds()
-    d = torch.load('/home/baroni/recnn/LSV1M_training/saved_models/brcnn__model_checkpoint_20250115_201226.pth')
+    d = torch.load('/home/baroni/recnn/LSV1M_training/saved_models/brcnn__model_checkpoint_20250117_001846.pth')
     model_config = d['model_config']
     model_state_dict = d['model_state_dict']
     core_state_dict = {k: v for k, v in model_state_dict.items() if k.startswith('core')}
@@ -80,7 +80,7 @@ def load_best_energy_model(population='both', dataloaders_batch_size=300, datalo
     """Load the best energy model checkpoint and configure it."""
     
     set_random_seeds()
-    d = torch.load('/home/baroni/recnn/LSV1M_training/saved_models/em__model_checkpoint_20250115_123827.pth')
+    d = torch.load('/home/baroni/recnn/LSV1M_training/saved_models/em__model_checkpoint_20250117_135034.pth')
     model_config = d['model_config']
     model_state_dict = d['model_state_dict']
     ######## Load checkpoint ###########
@@ -122,10 +122,13 @@ def load_best_energy_model(population='both', dataloaders_batch_size=300, datalo
     return (model, dataloaders) if return_dataloaders else model
 
 
-model, dataloaders = load_brcnn_model(return_dataloaders=True)
-model.to('cuda')
-from LSV1M_training.LSV1M_utils import evaluate_generalization
-evaluate_generalization(model, dataloaders, device='cuda', log=False)
+# model = load_brcnn_model(return_dataloaders=False)
+# em = load_best_energy_model(return_dataloaders=False)
+# model.to('cuda')
+# from LSV1M_training.LSV1M_utils import evaluate_generalization
+# evaluate_generalization(model, dataloaders, device='cuda', log=False)
+
+#%%
 
 #%%
 #%% old code

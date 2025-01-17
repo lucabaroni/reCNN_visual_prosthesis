@@ -4,10 +4,13 @@ from classical_exps.functions.analyses import *
 from classical_exps.functions.utils import plot_img, pickleread
 from LSV1M_training.load_best_models import load_brcnn_model
 
+## (optional) Device to perform the experiments on (default will be gpu if available, cpu else)
+device='cuda:1'
+
 model = load_brcnn_model()
 # set directo
 main_dir = "/home/baroni/recnn"
-run_dir = '/home/baroni/recnn/LSV1M_training/check_best_model'
+run_dir = '/home/baroni/recnn/LSV1M_training/check_LSV1M_model'
 objects_dir = run_dir + "/objects"
 
 ## Name of the HDF5 file 
@@ -18,7 +21,7 @@ all_neurons_model = model
 all_neurons_model.eval()
 
 ## Chose the indices of the neurons to work with
-neuron_ids = np.arange(100) 
+neuron_ids = np.arange(25) 
 
 ## Grating parameters to test #TODO check this
 orientations = np.linspace(0, np.pi, 37)[:-1] 
@@ -29,7 +32,7 @@ phases = np.linspace(0, 2*np.pi, 37)[:-1]
 dot_size_in_pixels_gauss = 3
 seed = 0
 bs=40
-
+num_dots = 100000
 ## Fixed image parameters
 contrast = 1         
 img_res = [55, 55] 
@@ -68,37 +71,36 @@ num_samples = 15
 ## If overwrite is set to True, this will clean the results of the performed experiments before reperforming them
 overwrite = False 
 
-## (optional) Device to perform the experiments on (default will be gpu if available, cpu else)
-device=None
 
 ## Example Pipeline
 experiments_config = [
-    ['get_all_grating_parameters', {
-        'h5_file':h5_file, 
-        'all_neurons_model':all_neurons_model, 
-        'neuron_ids':neuron_ids, 
-        'overwrite':True, 
-        'orientations':orientations, 
-        'spatial_frequencies':spatial_frequencies, 
-        'phases':phases, 'contrast':contrast,
-        'img_res':img_res,
-        'pixel_min':pixel_min,
-        'pixel_max':pixel_max,
-        'device':device,
-        'size':size}], 
-    ['get_preferred_position', {
-        'h5_file':h5_file,
-        'all_neurons_model':all_neurons_model,
-        'neuron_ids':neuron_ids,
-        'overwrite':True,
-        'dot_size_in_pixels':dot_size_in_pixels_gauss,
-        'contrast':contrast,
-        'img_res':img_res,
-        'pixel_min':pixel_min,
-        'pixel_max':pixel_max,
-        'device':device,
-        'bs':bs,
-        'seed':seed}], 
+    # ['get_all_grating_parameters', {
+    #     'h5_file':h5_file, 
+    #     'all_neurons_model':all_neurons_model, 
+    #     'neuron_ids':neuron_ids, 
+    #     'overwrite':True, 
+    #     'orientations':orientations, 
+    #     'spatial_frequencies':spatial_frequencies, 
+    #     'phases':phases, 'contrast':contrast,
+    #     'img_res':img_res,
+    #     'pixel_min':pixel_min,
+    #     'pixel_max':pixel_max,
+    #     'device':device,
+    #     'size':size}], 
+    # ['get_preferred_position', {
+    #     'h5_file':h5_file,
+    #     'all_neurons_model':all_neurons_model,
+    #     'neuron_ids':neuron_ids,
+    #     'overwrite': True,
+    #     'dot_size_in_pixels': dot_size_in_pixels_gauss,
+    #     'contrast':contrast,
+    #     'img_res':img_res,
+    #     'pixel_min':pixel_min,
+    #     'pixel_max':pixel_max,
+    #     'device':device,
+    #     'bs':bs,
+    #     'num_dots':num_dots,
+    #     'seed':seed}], 
     ['size_tuning_experiment_all_phases', {
         'h5_file':h5_file,
         'all_neurons_model':all_neurons_model,
