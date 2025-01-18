@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 n = 25
 # Path to your HDF5 file
-file_path = '/project/check_trained_model/results_LSV1M_model_new_model.h5'
+file_path = '/home/baroni/recnn/LSV1M_training/check_LSV1M_model/new_results_LSV1M_model_new_model.h5'
 
 # Open the HDF5 file in read mode
 with h5py.File(file_path, 'r') as h5file:
@@ -41,4 +41,4 @@ with h5py.File(file_path, 'r') as h5file:
         
     else:
         print("'size_tuning/curves' group not found in the file.")
-# %%
+d# %%
