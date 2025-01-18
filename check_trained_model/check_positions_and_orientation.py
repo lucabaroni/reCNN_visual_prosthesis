@@ -48,7 +48,7 @@ with h5py.File(file_path, 'r') as h5file:
     # Stack all the datasets along a new axis (e.g., axis 0)
     stacked_data = np.stack(datasets, axis=0)
 
-# Optionally, print the shape of the stacked array to confirm
+# Optionally, print the shape of the stacked array to confirmmo
 print(f"Stacked data shape: {stacked_data.shape}")
 
 idxx = (stacked_data[:,0]!=27.5) * (stacked_data[:,2] < 1)
