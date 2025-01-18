@@ -15,7 +15,7 @@ from nnfabrik.builder import get_model, get_trainer, get_data
 import nnvision
 from models import EnergyModel
 from pickle_utils import pickleread
-from utils import get_config
+# from utils import get_config
 from nnfabrik.utility.nn_helpers import set_random_seed, get_dims_for_loader_dict
 from nnvision.utility.measures import get_avg_correlations, get_correlations, get_MSE
 from models import BRCNN_with_common_scaling, BRCNN_no_scaling, single_BRCNN_no_scaling
@@ -185,5 +185,5 @@ results = {
     # 'test/avg_corr': get_avg_correlations(model, dataloaders['test'], as_dict=False, per_neuron=False),
 }
 # %%
-results
+
 # %%

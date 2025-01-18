@@ -14,7 +14,7 @@ from nnfabrik.builder import get_model, get_trainer, get_data
 import nnvision
 from models import EnergyModel
 from pickle_utils import pickleread
-from utils import get_config
+# from utils import get_config
 from nnfabrik.utility.nn_helpers import set_random_seed, get_dims_for_loader_dict
 from nnvision.utility.measures import get_avg_correlations, get_correlations, get_MSE
 from models import  BRCNN_no_scaling#, single_BRCNN_no_scaling, BRCNN_with_common_scaling,
@@ -55,7 +55,7 @@ torch.save(
         'config' : run.config,
         'core_state_dict' : x
     },
-    '/project/LSV1M_training/artifacts/core_sd:v8/core_sd_and_config.pth'
+    '/home/baroni/recnn/LSV1M_training/artifacts/core_sd:v8/core_sd_and_config.pth'
 )
 
 #%%
