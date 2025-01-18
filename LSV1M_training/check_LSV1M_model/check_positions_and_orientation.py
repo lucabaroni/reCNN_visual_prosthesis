@@ -9,7 +9,8 @@ pos1 = np.concatenate([pos_ori['V1_Exc_L23']['pos_x'], pos_ori['V1_Inh_L23']['po
 pos2 = np.concatenate([pos_ori['V1_Exc_L23']['pos_y'], pos_ori['V1_Inh_L23']['pos_y']]) / (5.5)
 ori = np.concatenate([pos_ori['V1_Exc_L23']['ori'], pos_ori['V1_Inh_L23']['ori']]) / np.pi
 
-def get_stacked_datasets(file_path, group, idxs=np.arange(100)):
+n = 25
+def get_stacked_datasets(file_path, group, idxs=np.arange(n)):
     with h5py.File(file_path, 'r') as h5file:
     
         # Initialize a list to hold the datasets
@@ -30,14 +31,14 @@ def get_stacked_datasets(file_path, group, idxs=np.arange(100)):
 
 ####### INSPECT POSITIONS #################
 # Open the HDF5 file
-file_path = '/project/check_trained_model/results_LSV1M_model.h5'
+file_path = '/home/baroni/recnn/LSV1M_training/check_LSV1M_model/new_results_LSV1M_model_new_model.h5'
 with h5py.File(file_path, 'r') as h5file:
     
     # Initialize a list to hold the datasets
     datasets = []
     
     # Iterate through the dataset names
-    for i in range(100):  # Assuming 'neuron_x' goes from 0 to 200
+    for i in range(n):  # Assuming 'neuron_x' goes from 0 to 200
         dataset_name = f'preferred_pos/neuron_{i}'
         if dataset_name in h5file:
             # Load the dataset into a NumPy array and append to the list
@@ -56,7 +57,7 @@ x = stacked_data[:,0]
 idxy = (stacked_data[:,1]!=27.5) * (stacked_data[:,2] < 1)
 y = stacked_data[:,1]
 
-plt.scatter(pos1[:100][idxx], x[idxx])
+plt.scatter(pos1[:n][idxx], x[idxx])
 plt.ylim(0, 55)
 plt.xlim(-1,1)
 plt.title('x axis')
@@ -65,7 +66,7 @@ plt.ylabel('Gaussian fit after dot stimulation')
 plt.gca().set_aspect(2/55, adjustable='box')
 plt.show()
 
-plt.scatter(pos2[:100][idxy], y[idxy])
+plt.scatter(pos2[:n][idxy], y[idxy])
 plt.ylim(0, 55)
 plt.xlim(-1,1)
 plt.title('y axis')
@@ -74,7 +75,8 @@ plt.ylabel('Gaussian fit after dot stimulation')
 # Ensure the axes are square
 plt.gca().set_aspect(2/55, adjustable='box')
 plt.show()
-
+# print(x)
+# print(y)
 
 # %% ORI 
 with h5py.File(file_path, 'r') as h5file:
@@ -83,7 +85,7 @@ with h5py.File(file_path, 'r') as h5file:
     datasets = []
     
     # Iterate through the dataset names
-    for i in range(100):  # Assuming 'neuron_x' goes from 0 to 200
+    for i in range(n):  # Assuming 'neuron_x' goes from 0 to 200
         dataset_name = f'full_field_params/neuron_{i}'
         if dataset_name in h5file:
             # Load the dataset into a NumPy array and append to the list
@@ -100,7 +102,7 @@ print(f"Stacked data shape: {stacked_data.shape}")
 ori2 = stacked_data[:,0]
 # %%
 
-plt.scatter(ori[:100], ori2 )
+plt.scatter(ori[:n], ori2 )
 plt.xlim(0, 1)
 plt.ylim(0, np.pi)
 plt.title('Orientation')

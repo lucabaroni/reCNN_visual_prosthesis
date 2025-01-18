@@ -2,8 +2,9 @@ import numpy as np
 from classical_exps.functions.experiments import *
 from classical_exps.functions.analyses import *
 from classical_exps.functions.utils import plot_img, pickleread
-from LSV1M_training.load_best_model import model
+from LSV1M_training.load_best_models import load_best_energy_model
 
+model = load_best_energy_model()
 # set directo
 main_dir = "/project"
 run_dir = '/project/check_trained_model'

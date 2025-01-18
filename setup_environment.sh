@@ -27,8 +27,10 @@ echo "Installing neuralpredictors from GitHub..."
 pip uninstall -y neuralpredictors || true
 pip install -e git+https://github.com/lucabaroni/neuralpredictors.git@recnn#egg=neuralpredictors
 
-echo "Installing protobuf..." 
-pip install protobuf
+pip install -e git+https://github.com/lucabaroni/featurevis_mod#egg=featurevis
+
+echo "Installing protobuf and seaborn..." 
+pip install protobuf seaborn
 
 echo "Installing project dependencies..."
 # Install project dependencies (current directory assumed to have the project)

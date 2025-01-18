@@ -2,12 +2,12 @@ import numpy as np
 from classical_exps.functions.experiments import *
 from classical_exps.functions.analyses import *
 from classical_exps.functions.utils import plot_img, pickleread
-from LSV1M_training.load_best_models import load_brcnn_model
+from LSV1M_training.load_best_models import load_best_brcnn_model
 
 ## (optional) Device to perform the experiments on (default will be gpu if available, cpu else)
 device='cuda:1'
 
-model = load_brcnn_model()
+model = load_best_brcnn_model()
 # set directo
 main_dir = "/home/baroni/recnn"
 run_dir = '/home/baroni/recnn/LSV1M_training/check_LSV1M_model'
@@ -87,7 +87,7 @@ experiments_config = [
     #     'pixel_max':pixel_max,
     #     'device':device,
     #     'size':size}], 
-    # ['get_preferred_position', {
+    # ['get_preferred_position_fast', {
     #     'h5_file':h5_file,
     #     'all_neurons_model':all_neurons_model,
     #     'neuron_ids':neuron_ids,
@@ -99,7 +99,6 @@ experiments_config = [
     #     'pixel_max':pixel_max,
     #     'device':device,
     #     'bs':bs,
-    #     'num_dots':num_dots,
     #     'seed':seed}], 
     ['size_tuning_experiment_all_phases', {
         'h5_file':h5_file,

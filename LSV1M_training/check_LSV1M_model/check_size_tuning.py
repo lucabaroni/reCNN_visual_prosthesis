@@ -7,6 +7,7 @@ import torch
 from classical_exps_config import radii
 import matplotlib.pyplot as plt
 
+n = 25
 # Path to your HDF5 file
 file_path = '/project/check_trained_model/results_LSV1M_model_new_model.h5'
 
@@ -17,7 +18,7 @@ with h5py.File(file_path, 'r') as h5file:
         group = h5file['size_tuning/curves']
         
         # Iterate over neurons from 0 to 99
-        for neuron_id in range(100):
+        for neuron_id in range(n):
             dataset_name = f'neuron_{neuron_id}'
             
             if dataset_name in group:

@@ -13,7 +13,7 @@ from LSV1M_training.LSV1M_utils import (
     set_brcnn_positions
 )
 
-def load_brcnn_model(population='both', dataloaders_batch_size=300, dataloaders_n_images_val=5000, neurons_subset='0', return_dataloaders=False):
+def load_best_brcnn_model(population='both', dataloaders_batch_size=300, dataloaders_n_images_val=5000, neurons_subset='0', return_dataloaders=False):
     """Load and configure a pretrained BRCNN model."""
     
     set_random_seeds()
@@ -106,7 +106,11 @@ def load_best_energy_model(population='both', dataloaders_batch_size=300, datalo
     # Initialize and load model
     model = EnergyModel(dataloaders, seed=0, **model_config)
     model.cuda()
-    model.load_state_dict(model_state_dict)
+    if neurons_subset == '0':
+        model.load_state_dict(model_state_dict)
+    else:
+        shared_params_state_dict = {k:v for k,v in model_state_dict.items() if k not in ['positions_x', 'positions_y', 'orientations', 'meshgrid_x', 'meshgrid_y']}
+        model.load_state_dict(shared_params_state_dict, strict=False)
 
     # Get positions and orientations
     pos1, pos2, ori = get_positions_and_orientations('/CSNG/baroni/Dic23data/pos_and_ori.pkl', neuron_idxs)
