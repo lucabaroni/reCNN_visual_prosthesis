@@ -155,3 +155,8 @@ LSV1M_training/to_delete/core
 **/__pycache__
 **/artifacts/
 **/wandb/
+*.zip
+*.pt
+*.svg
+*.png
+data/
