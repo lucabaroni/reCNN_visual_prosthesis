@@ -1,6 +1,8 @@
 oris_pred.pickle
 neurons.npy
 macaque_data/
+v1_data/
+v1_data.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -148,3 +150,16 @@ metacentrum/qsub_jupyterlab3.sh
 metacentrum/qsub_smaller.sh
 
 settings.json
+LSV1M_training/saved_models/
+*.pth
+*.pkl
+LSV1M_training/to_delete/core
+**/__pycache__
+**/artifacts/
+**/wandb/
+
+src/
+**/src/
+
+!models_artifacts/LSV1M_data_model/core_sd.pth
+!models_artifacts/macaque_data_model/model.pt
