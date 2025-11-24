@@ -5,14 +5,38 @@ from models import BRCNN_no_scaling, EnergyModel
 import torch
 import numpy as np
 import h5py
+import pandas as pd
 
 def load_model_checkpoint(checkpoint_path):
     """Load model checkpoint and return state dict and config"""
     checkpoint = torch.load(checkpoint_path)
     return checkpoint['model_state_dict'], checkpoint['model_config']
 
+
 def get_subject_filenames(filenames):
-    """Split filenames by subject and get indices"""
+    """Split filenames by subject and get indices. Works only on the old data format."""
+    subject_0_files = []
+    subject_1_files = []
+    ids0 = []
+    ids1 = []
+    skip = 0
+    
+    for file in filenames:
+        n = len(eval(pd.read_csv(file + '/responses.csv')['responses'][0]))
+        subject_id = pd.read_json(file + '/meta_data.json')['subject_id'].iloc[0]
+        if subject_id == 31:
+            subject_0_files.append(file)
+            ids0.extend(list(np.arange(skip, skip + n)))
+        else:
+            subject_1_files.append(file)
+            ids1.extend(list(np.arange(skip, skip + n)))
+        skip += n
+    return subject_0_files, subject_1_files, ids0, ids1
+
+
+
+def get_subject_filenames_old(filenames):
+    """Split filenames by subject and get indices. Works only on the old data format."""
     subject_0_files = []
     subject_1_files = []
     ids0 = []
@@ -32,6 +56,20 @@ def get_subject_filenames(filenames):
     return subject_0_files, subject_1_files, ids0, ids1
 
 def get_dataset_config(neuronal_data_files, batch_size=4):
+    """Get dataset configuration"""
+    return ('nnvision.datasets.monkey_loaders.monkey_static_loader_combined_new_data_format',
+            {'dataset': 'CSRF19_V1',
+             'neuronal_data_files': neuronal_data_files,
+             'image_cache_path': '../v1_data/images_npy/',
+             'crop': 70,
+             'subsample': 1,
+             'seed': 1000,
+             'scale': 0.5,
+             'time_bins_sum': 12,
+             'batch_size': batch_size,
+             'normalize_resps': True})
+
+def get_dataset_config_old(neuronal_data_files, batch_size=4):
     """Get dataset configuration"""
     return ('nnvision.datasets.monkey_loaders.monkey_static_loader_combined',
             {'dataset': 'CSRF19_V1',
@@ -62,7 +100,47 @@ def load_neuron_preferences(h5_path, num_neurons=458):
     return map(torch.Tensor, (pos1, pos2, ori))
 
 def get_monkey_subjects_info():
-    """Get filenames and indices for both monkey subjects."""
+    """Get filenames and indices for both monkey subjects. Works only on the old data format."""
+    all_filenames = [
+        '../v1_data/train/3631896544452',
+        '../v1_data/train/3632669014376',
+        '../v1_data/train/3632932714885',
+        '../v1_data/train/3633364677437',
+        '../v1_data/train/3634055946316',
+        '../v1_data/train/3634142311627',
+        '../v1_data/train/3634658447291',
+        '../v1_data/train/3634744023164',
+        '../v1_data/train/3635178040531',
+        '../v1_data/train/3635949043110',
+        '../v1_data/train/3636034866307',
+        '../v1_data/train/3636552742293',
+        '../v1_data/train/3637161140869',
+        '../v1_data/train/3637248451650',
+        '../v1_data/train/3637333931598',
+        '../v1_data/train/3637760318484',
+        '../v1_data/train/3637851724731',
+        '../v1_data/train/3638367026975',
+        '../v1_data/train/3638456653849',
+        '../v1_data/train/3638885582960',
+        '../v1_data/train/3638373332053',
+        '../v1_data/train/3638541006102',
+        '../v1_data/train/3638802601378',
+        '../v1_data/train/3638973674012',
+        '../v1_data/train/3639060843972',
+        '../v1_data/train/3639406161189',
+        '../v1_data/train/3640011636703',
+        '../v1_data/train/3639664527524',
+        '../v1_data/train/3639492658943',
+        '../v1_data/train/3639749909659',
+        '../v1_data/train/3640095265572',
+        '../v1_data/train/3631807112901'
+    ]
+    subject_0_filenames, subject_1_filenames, ids0, ids1 = get_subject_filenames(all_filenames)
+    return all_filenames, subject_0_filenames, subject_1_filenames, ids0, ids1
+
+
+def get_monkey_subjects_info_old():
+    """Get filenames and indices for both monkey subjects. Works only on the old data format."""
     all_filenames = [
         '/data/monkey/toliaslab/CSRF19_V1/neuronal_data/CSRF19_V1_3631896544452.pickle',
         '/data/monkey/toliaslab/CSRF19_V1/neuronal_data/CSRF19_V1_3632669014376.pickle',
@@ -97,7 +175,7 @@ def get_monkey_subjects_info():
         '/data/monkey/toliaslab/CSRF19_V1/neuronal_data/CSRF19_V1_3640095265572.pickle',
         '/data/monkey/toliaslab/CSRF19_V1/neuronal_data/CSRF19_V1_3631807112901.pickle'
     ]
-    subject_0_filenames, subject_1_filenames, ids0, ids1 = get_subject_filenames(all_filenames)
+    subject_0_filenames, subject_1_filenames, ids0, ids1 = get_subject_filenames_old(all_filenames)
     return all_filenames, subject_0_filenames, subject_1_filenames, ids0, ids1
 
 def get_best_brcnn_model(subject='both', return_dataloaders=False):
@@ -112,11 +190,7 @@ def get_best_brcnn_model(subject='both', return_dataloaders=False):
         dict, optional: Dataloaders if return_dataloaders is True
     """
     model_state_dict, model_config = load_model_checkpoint(
-        # '/project/monkey_training/artifacts/best_model:v4/fine_tune=core_best_model.pt' # brcnn model V1
-        # '/project/monkey_training/artifacts/best_model:v58/fine_tune=core_best_model.pt' # brcnn model V2: best at generalizing to second subject, bad size tuning
-        # '/project/monkey_training/artifacts/best_model:v75/fine_tune=core_best_model.pt' # brcnn model V3: second best generalization, limited size tuning
-        '/project/monkey_training/artifacts/best_model:v30/fine_tune=core_best_model.pt' # brcnn model V4: third best generalization, good size tuning
-        # '/project/monkey_training/artifacts/best_model:v35/fine_tune=core_best_model.pt' # brcnn model V5:
+        'artifacts/best_model:v30/fine_tune=core_best_model.pt'
     )
     all_filenames, subject_0_filenames, subject_1_filenames, ids0, ids1 = get_monkey_subjects_info()
     
