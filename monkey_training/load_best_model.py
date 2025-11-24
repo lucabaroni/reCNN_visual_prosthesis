@@ -190,7 +190,8 @@ def get_best_brcnn_model(subject='both', return_dataloaders=False):
         dict, optional: Dataloaders if return_dataloaders is True
     """
     model_state_dict, model_config = load_model_checkpoint(
-        'artifacts/best_model:v30/fine_tune=core_best_model.pt'
+        # 'artifacts/best_model:v30/fine_tune=core_best_model.pt'
+        'models_artifacts/LSV1M_data_model/core_sd.pth'
     )
     all_filenames, subject_0_filenames, subject_1_filenames, ids0, ids1 = get_monkey_subjects_info()
     
