@@ -1,6 +1,8 @@
 oris_pred.pickle
 neurons.npy
 macaque_data/
+v1_data/
+v1_data.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
