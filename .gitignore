@@ -160,3 +160,6 @@ LSV1M_training/to_delete/core
 
 src/
 **/src/
+
+!models_artifacts/LSV1M_data_model/core_sd.pth
+!models_artifacts/macaque_data_model/model.pt
