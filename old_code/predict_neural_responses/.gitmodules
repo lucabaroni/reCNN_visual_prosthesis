@@ -1,3 +1,0 @@
-[submodule "dnn_blocks"]
-	path = dnn_blocks
-	url = https://github.com/lucabaroni/dnn_blocks
