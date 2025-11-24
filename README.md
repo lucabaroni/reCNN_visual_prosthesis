@@ -3,6 +3,26 @@
 ![alt text](readme_imgs/pipeline.png)
 ![alt text](readme_imgs/results.png)
 
+## Paper
+
+Read the paper on [bioRxiv](https://www.biorxiv.org/content/10.1101/2025.11.03.684808v1)
+
+### Citation
+
+If you use this code in your research, please cite:
+```bibtex
+@article{Baroni2025.11.03.684808,
+    author = {Baroni, Luca and Picek, Martin and Patel, Saumil and Tolias, Andreas S. and Antolik, Jan},
+    title = {Beyond retinotopy: exploiting native visual representations in cortical neuroprostheses for vision loss remediation},
+    elocation-id = {2025.11.03.684808},
+    year = {2025},
+    doi = {10.1101/2025.11.03.684808},
+    publisher = {Cold Spring Harbor Laboratory},
+    URL = {https://www.biorxiv.org/content/early/2025/11/04/2025.11.03.684808},
+    journal = {bioRxiv}
+}
+```
+
 ## Environment setup
 
 ```bash
@@ -42,3 +62,8 @@ finally preprocess it for the dataloaders
 ```bash
 python convert_img_to_npy.py
 ```
+
+
+## LSV1M optogenetic stimulation experiments
+
+The large-scale V1 model optogenetic stimulation experiments were run with [Mozaik](https://github.com/CSNG-MFF/mozaik) and [Mozaik Models](https://github.com/lucabaroni/mozaik-models)
