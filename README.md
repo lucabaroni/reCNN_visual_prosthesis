@@ -1,65 +1,44 @@
-# Rotation-equivariant convolutional neural network for design of visual prosthetic stimulation protocol
+# Beyond retinotopy: exploiting native visual representations in cortical neuroprostheses for vision loss remediation
 
-The code for Martin Picek's bachelor thesis supervised by Ján Antolík and Luca Baroni
+![alt text](readme_imgs/pipeline.png)
+![alt text](readme_imgs/results.png)
 
-To clone the repository:
+## Environment setup
+
 ```bash
-git clone --recurse-submodules git@github.com:mpicek/reCNN_visual_prosthesis.git
+./setup_environment.sh
 ```
 
-Bachelor thesis is in [this github repo](https://github.com/mpicek/bachelor_thesis).
+## Code structure
 
-## Running the network
+- `LSV1M_training/`: experiments on data from the large scale V1 dataset with the spiking neural network model.
+- `monkey_training/`: experiments on monkey data.
+- `optogenetic_experiments/`: optogenetic experiments on the LSV1M model.
 
-Use a Docker image from [this repository](https://github.com/mpicek/csng_dl_docker_image).
-It can be obtained from the Docker Hub [here](https://hub.docker.com/repository/docker/picekma/csng_docker_dl/general) - more on instalation in the previous repository.
+## Load models
 
-Run the image locally:
-```
-docker run --gpus all -it --rm -v local_dir:$(pwd) picekma/csng_docker_dl:0.1
-```
-Or on MetaCentrum:
-```
-singularity shell --nv -B $SCRATCHDIR /path/to/the/image.img
-```
-where you have to specify your path to a builded Singularity container. The build is
-described in the repository with the Docker file.
-
-In the container, execute `source activate csng-dl` in order to activate conda environment.
-
-Then run `python train_on_lurz.py`, the network starts a training.
-
-## Run the best models
-
-To run an evaluation on the best models and see the results, run `python present_best_models.py --dataset_type both`.
-
-## Run experiments and generate figures
-
-Run `python experiments/experiments.py` to obtain information from experiments as well as generated graphs in `img/` directory.
-
-## Creating and running a sweep
-
-Connect to MetaCentrum, clone this repository, build a Singularity image
-of the docker image provided by us (previous section) and specify the path
-to this image in `metacentrum/qsub_script.sh` as well as path to this repository.
-
-Add your wandb API key to file `metacentrum/wandb_api_key.yaml` in this format:
-```yaml
-WANDB_API_KEY: your_api_key
-```
-Your wandb API key can be found in your [wandb settings](https://wandb.ai/settings).
-
-Configure a sweep in sweep.yaml.
-
-Create a sweep with `wandb sweep sweep.yaml` and copy the command into `metacentrum/cmd`
-so that the file looks like this (for example):
-```
-# run the same command again and again
-wandb agent csng-cuni/reCNN_visual_prosthesis/6ggort1b
+```python
+# load model trained on LSV1M dataset
+from LSV1M_training.load_best_models import load_model_x
+model = load_model_x(neurons_subset='0', return_dataloaders=False)  
 ```
 
-To run 3 machines on MetaCentrum that connect as sweep agents, use this
-command.
+```python
+# load model trained on macaque dataset (need to first download and preprocess data)
+from monkey_training.load_best_models import get_best_brcnn_model
+model = get_best_brcnn_model(neurons_subset='0', return_dataloaders=False)  
+```
+
+## Download and preprocess monkey data
+first download the data
 ```bash
-python3 ./run_commands.py --command_file=cmd --script=qsub_script.sh --wandb_api_key --num_of_command_repetitions=3
+wget --content-disposition      --user-agent="Mozilla/5.0"      https://figshare.com/ndownloader/files/40805201
+```
+then unzip it
+```bash
+unzip v1_data.zip
+```
+finally preprocess it for the dataloaders
+```bash
+python convert_img_to_npy.py
 ```
